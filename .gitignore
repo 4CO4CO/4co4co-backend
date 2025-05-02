@@ -1,0 +1,17 @@
+# Python (모든 폴더 공통)
+**/__pycache__/
+**/*.pyc
+
+# Virtual environments (각 하위 폴더별)
+**/.venv/
+
+# Environment files
+**/.env
+
+# IDE configs (루트 및 하위 폴더 전부)
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
