@@ -1,6 +1,8 @@
 import os
 from uuid import uuid4
 from fastapi import HTTPException
+
+from app.core.exceptions import FileSaveError, ValidationError
 from app.schemas.user import UserDBModel
 from app.repositories.user_repository import UserRepository
 
@@ -15,7 +17,7 @@ class UserService:
 
     async def create_user(self, name, image):
         if not name.strip():
-            raise HTTPException(status_code=400, detail="Name is required")
+            raise ValidationError("Name is required")
 
         file_path = await self._save_file(image)
         user_key = str(uuid4())
@@ -26,11 +28,7 @@ class UserService:
             image_path=file_path
         )
 
-        try:
-            await self.user_repo.insert_user(user_model.model_dump())
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
+        await self.user_repo.insert_user(user_model.model_dump())
         return user_key
 
     async def _save_file(self, image):
@@ -43,6 +41,6 @@ class UserService:
             with open(file_path, "wb") as buffer:
                 buffer.write(content)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"File saving failed: {e}")
+            raise FileSaveError(f"File saving failed: {e}") from e
 
         return file_path

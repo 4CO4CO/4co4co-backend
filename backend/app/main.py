@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
-from app.core.exceptions import http_exception_handler, validation_exception_handler
+from app.core.exception_handlers import http_exception_handler, validation_exception_handler
 from app.api.v1 import user_api
 from app.core.database import lifespan
 

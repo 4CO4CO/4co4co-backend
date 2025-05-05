@@ -1,25 +1,35 @@
-from fastapi import Request, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from app.core.response import error_response
+class AppError(Exception):
+    """Base class for all custom application exceptions."""
+    status_code = 500
+
+    def __init__(self, message="Application error"):
+        self.message = message
+        super().__init__(message)
 
 
-# HTTPException 처리 핸들러
-# 예: raise HTTPException(status_code=400, detail="Name is required")에서 발생
-async def http_exception_handler(request: Request, exc: HTTPException):
-    response = error_response(message=exc.detail)
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=response.dict()
-    )
+class DatabaseError(AppError):
+    """Raised when a database operation fails."""
+    def __init__(self, message="Database operation failed"):
+        super().__init__(message)
 
 
-# RequestValidationError 처리 핸들러
-# 예: 필수 필드 누락, 잘못된 타입 등 Pydantic 유효성 검증에서 발생 (422 상태)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    first_error = exc.errors()[0]["msg"] if exc.errors() else "Invalid request"
-    response = error_response(message=first_error)
-    return JSONResponse(
-        status_code=422,
-        content=response.dict()
-    )
+class FileSaveError(AppError):
+    """Raised when file saving fails."""
+    def __init__(self, message="File saving failed"):
+        super().__init__(message)
+
+
+class ValidationError(AppError):
+    """Raised when input validation fails."""
+    status_code = 400
+
+    def __init__(self, message="Validation error"):
+        super().__init__(message)
+
+
+class NotFoundError(AppError):
+    """Raised when a requested resource is not found."""
+    status_code = 404
+
+    def __init__(self, message="Resource not found"):
+        super().__init__(message)
