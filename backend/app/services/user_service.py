@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from uuid import uuid4
 
 from app.core.exceptions import FileSaveError, ValidationError
@@ -24,7 +25,8 @@ class UserService:
         user_model = UserDBModel(
             user_key=user_key,
             name=name,
-            image_path=file_path
+            image_path=file_path,
+            created_at=datetime.utcnow()
         )
 
         await self.user_repo.insert_user(user_model.model_dump())
