@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.config import settings
@@ -39,3 +39,7 @@ async def lifespan(app: FastAPI):
             logger.info("MongoDB 클라이언트 연결 종료")
         except Exception as close_err:
             logger.error(f"MongoDB 종료 중 에러 발생: {close_err}")
+
+
+def get_mongo_client(request: Request):
+    return request.app.database
