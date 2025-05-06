@@ -1,3 +1,5 @@
+from typing import Optional
+
 from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict, field_serializer
 from datetime import datetime
@@ -6,7 +8,7 @@ from datetime import datetime
 class MusicDBModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: ObjectId = Field(alias="_id")
+    id: Optional[ObjectId] = Field(default=None, alias="_id")
     user_key: str
     prompt: str
     s3_path: str

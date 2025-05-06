@@ -20,7 +20,7 @@ def get_musicgen_model():
 
 @router.post("/generate-music")
 async def generate_music(request: PromptRequest, model=Depends(get_musicgen_model)):
-    output_path = generate_music_service(request.prompt, model)
+    output_path = await generate_music_service(request.prompt, model)
     return success_response(
         data={"file_path": output_path},
         message="Music generated"

@@ -4,6 +4,7 @@ import httpx
 from app.core.exceptions import NotFoundError, AIResponseProcessingError
 from app.repositories.music_repository import MusicRepository
 from app.repositories.user_repository import UserRepository
+from app.schemas.music import MusicDBModel
 
 
 class MusicService:
@@ -13,24 +14,23 @@ class MusicService:
         self.music_repo = MusicRepository(db)
 
     async def generate_music(self, prompt: str, user_key: str):
-        # 사용자 존재 여부 확인
         user = await self.user_repo.find_user_by_key(user_key)
         if not user:
             raise NotFoundError(f"User with key {user_key} not found.")
 
-        # AI 서버 호출
         result = await self.call_ai_server(prompt)
         file_path = result['data'].get('file_path')
         if not file_path:
             raise AIResponseProcessingError("No file path returned from AI")
 
-        # DB에 음악 기록 저장
-        await self.music_repo.save_user_music(
+        music_model = MusicDBModel(
             user_key=user_key,
             prompt=prompt,
             s3_path=file_path,
             created_at=datetime.utcnow()
         )
+
+        await self.music_repo.save_user_music(music_model)
         return result
 
     async def call_ai_server(self, prompt: str):
