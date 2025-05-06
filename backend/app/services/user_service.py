@@ -1,19 +1,18 @@
 import os
 from uuid import uuid4
-from fastapi import HTTPException
 
 from app.core.exceptions import FileSaveError, ValidationError
-from app.schemas.user import UserDBModel
 from app.repositories.user_repository import UserRepository
+from app.schemas.user import UserDBModel
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 class UserService:
-    def __init__(self, request):
-        self.db = request.app.database
-        self.user_repo = UserRepository(self.db)
+    def __init__(self, db):
+        self.db = db
+        self.user_repo = UserRepository(db)
 
     async def create_user(self, name, image):
         if not name.strip():
