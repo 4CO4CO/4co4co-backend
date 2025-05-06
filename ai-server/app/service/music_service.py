@@ -1,10 +1,16 @@
+import asyncio
 import os
 import uuid
 from datetime import datetime
+
 import torchaudio
 
 
-def generate_music_service(prompt: str, model) -> str:
+async def generate_music_service(prompt: str, model) -> str:
+    return await asyncio.to_thread(_blocking_generate_music, prompt, model)
+
+
+def _blocking_generate_music(prompt: str, model) -> str:
     os.makedirs("output", exist_ok=True)
 
     model.set_generation_params(duration=10)
