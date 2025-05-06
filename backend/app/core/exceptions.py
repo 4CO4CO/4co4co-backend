@@ -33,3 +33,9 @@ class NotFoundError(AppError):
 
     def __init__(self, message="Resource not found"):
         super().__init__(message)
+
+
+class AIResponseProcessingError(AppError):
+    """Raised when AI response processing failed."""
+    def __init__(self, message="AI response processing failed"):
+        super().__init__(message)

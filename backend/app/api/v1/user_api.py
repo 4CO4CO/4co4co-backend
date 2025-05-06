@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, UploadFile, File, Form
 from app.services.user_service import UserService
 from app.core.response import success_response
 
-router = APIRouter(prefix="/api/v1/users")
+router = APIRouter()
 
 
 @router.post("/")
