@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.v1.endpoints import router
+from app.api.v1.music_api import router
 from app.core.exception_handlers import ai_server_error_handler
 from app.core.exceptions import AIServerError
 
