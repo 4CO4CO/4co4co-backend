@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 
 from app.api.v1.routers import api_router
-from app.core.config import settings
+from app.core.settings import settings
 from app.core.database import lifespan
 from app.core.exception_handlers import http_exception_handler, validation_exception_handler
 

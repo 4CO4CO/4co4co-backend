@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from app.core.config import settings
+from app.core.settings import settings
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
