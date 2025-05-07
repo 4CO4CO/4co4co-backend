@@ -115,5 +115,10 @@ def run_outpaint(pipe, input_path, output_path, prompt=""):
     comp = bg.convert("RGBA")
     out_rgba = result_image.convert("RGBA")
     comp.paste(out_rgba, (0, 0), mask)
-    comp.save(output_path)
-    print(f"Saved outpainted image to {output_path}")
+
+    # Convert the final composite image to RGB (to avoid issues with JPEG)
+    comp_rgb = comp.convert("RGB")
+
+    # Save as JPEG
+    comp_rgb.save(output_path, "JPEG")
+    return output_path
