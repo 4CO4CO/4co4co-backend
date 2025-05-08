@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from app.services.music_service import MusicService
 from app.core.database import get_mongo_client
+from app.core.response import success_response
 
 router = APIRouter()
 
@@ -17,4 +18,5 @@ async def generate_music(
         db=Depends(get_mongo_client)
 ):
     music_service = MusicService(db)
-    return await music_service.generate_music(prompt=request.prompt, user_key=user_key)
+    result = await music_service.generate_music(prompt=request.prompt, user_key=user_key)
+    return success_response(data=result, message="Music Generated")

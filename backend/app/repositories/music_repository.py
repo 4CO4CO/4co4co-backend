@@ -18,3 +18,11 @@ class MusicRepository:
             return [doc async for doc in cursor]
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e
+
+    async def find_recent_musics(self, limit: int = 20):
+        try:
+            cursor = self.collection.find().sort("created_at", -1).limit(limit)
+            return [doc async for doc in cursor]
+        except Exception as e:
+            raise DatabaseError(f"Database query failed: {e}") from e
+
