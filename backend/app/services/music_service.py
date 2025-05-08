@@ -19,7 +19,7 @@ class MusicService:
         if not user:
             raise NotFoundError(f"Lantern ID {lantern_id} not found.")
 
-        result = await self.call_ai_server(prompt)
+        result = await self.mock_ai_client(prompt)
         file_path = result['data'].get('file_path')
         if not file_path:
             raise AIResponseProcessingError("No file path returned from AI")

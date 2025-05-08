@@ -11,11 +11,19 @@ ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
 MAX_FILE_SIZE_MB = 5
 
 
-@router.post("/lanterns")
+@router.post(
+    "/lanterns",
+    responses={
+        200: {"description": "Lantern successfully created"},
+        400: {"description": "Bad Request - Validation failed (blank name, invalid format, oversized file)"},
+        422: {"description": "Unprocessable Entity - Missing required fields or wrong types"},
+        500: {"description": "Internal Server Error"}
+    }
+)
 async def create_lanterns(
-        name: str = Form(...),
-        image: UploadFile = File(...),
-        db=Depends(get_mongo_client)
+    name: str = Form(..., min_length=1, max_length=50, description="Lantern name (1-50 characters)"),
+    image: UploadFile = File(..., description="Image file (jpg, jpeg, png, webp, max 5MB)"),
+    db=Depends(get_mongo_client)
 ):
     if not name.strip():
         raise ValidationError("Lantern name cannot be blank.")
@@ -38,10 +46,19 @@ async def create_lanterns(
     return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")
 
 
-@router.get("/lanterns")
+@router.get(
+    "/lanterns",
+    responses={
+        200: {"description": "Successfully retrieved lantern list"},
+        400: {"description": "Bad Request - Invalid current_lantern_id format"},
+        404: {"description": "Not Found - Lantern not found"},
+        422: {"description": "Unprocessable Entity - Missing or invalid query parameter"},
+        500: {"description": "Internal Server Error"}
+    }
+)
 async def get_lanterns(
-        current_lantern_id: str = Query(...),
-        db=Depends(get_mongo_client)
+    current_lantern_id: str = Query(...),
+    db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
     lanterns = await lantern_service.get_recent_lanterns(current_lantern_id=current_lantern_id)
@@ -51,7 +68,16 @@ async def get_lanterns(
     )
 
 
-@router.get("/lanterns/{lantern_id}")
+@router.get(
+    "/lanterns/{lantern_id}",
+    responses={
+        200: {"description": "Successfully retrieved lantern detail"},
+        400: {"description": "Bad Request - Invalid lantern_id or current_lantern_id format"},
+        404: {"description": "Not Found - Lantern not found"},
+        422: {"description": "Unprocessable Entity - Missing or invalid parameters"},
+        500: {"description": "Internal Server Error"}
+    }
+)
 async def get_lantern_detail(
         lantern_id: str,
         current_lantern_id: str = Query(...),
