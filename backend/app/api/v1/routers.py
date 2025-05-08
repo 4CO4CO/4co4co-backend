@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from app.api.v1 import music_api, lantern_api
 
 api_router = APIRouter()

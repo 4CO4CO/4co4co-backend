@@ -1,9 +1,10 @@
 from datetime import datetime
+
 import httpx
 
 from app.core.exceptions import NotFoundError, AIResponseProcessingError
-from app.repositories.music_repository import MusicRepository
 from app.repositories.lantern_repository import LanternRepository
+from app.repositories.music_repository import MusicRepository
 from app.schemas.db.music import MusicDBModel
 
 

@@ -9,7 +9,7 @@ class LanternDBModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: Optional[ObjectId] = Field(default=None, alias="_id")
-    lantern_id: str  # UUID
+    lantern_id: str
     user_name: str
     image_path: str
     original_filename: Optional[str] = None

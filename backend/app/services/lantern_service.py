@@ -3,9 +3,9 @@ from datetime import datetime
 from uuid import uuid4
 
 from app.core.exceptions import FileSaveError, ValidationError
+from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
 from app.repositories.panorama_repository import PanoramaRepository
-from app.repositories.lantern_repository import LanternRepository
 from app.schemas.db.lantern import LanternDBModel
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_list_response import LanternListResponseModel
