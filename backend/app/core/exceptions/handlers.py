@@ -4,8 +4,8 @@ from fastapi import Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.core.exceptions import AppError
-from app.core.response import error_response
+from app.core.exceptions.types import AppError
+from app.core.response.response import error_response
 
 # 로거 설정
 logger = logging.getLogger("uvicorn.error")

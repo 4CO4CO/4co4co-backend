@@ -1,4 +1,4 @@
-from app.core.exceptions import DatabaseError
+from app.core.exceptions.types import DatabaseError
 
 
 class LanternRepository:
@@ -12,16 +12,16 @@ class LanternRepository:
         except Exception as e:
             raise DatabaseError(f"Database insert failed: {e}") from e
 
-    async def find_all_lanterns(self):
-        try:
-            cursor = self.collection.find().sort("created_at", -1)
-            return [doc async for doc in cursor]
-        except Exception as e:
-            raise DatabaseError(f"Database query failed: {e}") from e
-
     async def find_by_lantern_id(self, lantern_id):
         try:
             user = await self.collection.find_one({"lantern_id": lantern_id})
             return user
+        except Exception as e:
+            raise DatabaseError(f"Database query failed: {e}") from e
+
+    async def find_recent_lanterns(self, limit: int = 20):
+        try:
+            cursor = self.collection.find().sort("created_at", -1).limit(limit)
+            return [doc async for doc in cursor]
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e

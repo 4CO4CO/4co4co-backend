@@ -1,21 +1,21 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
 
-from app.core.database import get_mongo_client
-from app.core.response import success_response
+from app.core.db.database import get_mongo_client
+from app.core.response.response import success_response
 from app.services.lantern_service import LanternService
 
 router = APIRouter()
 
 
-@router.post("/users")
-async def create_user(
+@router.post("/lanterns")
+async def create_lanterns(
         name: str = Form(...),
         image: UploadFile = File(...),
         db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
-    user_key = await lantern_service.create_user(name, image)
-    return success_response(data={"user_key": user_key}, message="User Created")
+    lantern_id = await lantern_service.create_lanterns(name, image)
+    return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")
 
 
 @router.get("/lanterns")

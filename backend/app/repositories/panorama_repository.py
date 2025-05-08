@@ -1,4 +1,4 @@
-from app.core.exceptions import DatabaseError
+from app.core.exceptions.types import DatabaseError
 
 
 class PanoramaRepository:

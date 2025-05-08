@@ -1,5 +1,4 @@
-from bson import ObjectId
-from app.core.exceptions import DatabaseError
+from app.core.exceptions.types import DatabaseError
 
 
 class MusicRepository:
@@ -19,15 +18,3 @@ class MusicRepository:
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e
 
-    async def find_recent_musics(self, limit: int = 20):
-        try:
-            cursor = self.collection.find().sort("created_at", -1).limit(limit)
-            return [doc async for doc in cursor]
-        except Exception as e:
-            raise DatabaseError(f"Database query failed: {e}") from e
-
-    async def find_music_by_id(self, music_id: str):
-        try:
-            return await self.collection.find_one({"_id": ObjectId(music_id)})
-        except Exception as e:
-            raise DatabaseError(f"Database query failed: {e}") from e

@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from uuid import uuid4
 
-from app.core.exceptions import FileSaveError, ValidationError
+from app.core.exceptions.types import FileSaveError, ValidationError
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
 from app.repositories.panorama_repository import PanoramaRepository
@@ -20,7 +20,7 @@ class LanternService:
         self.music_repo = MusicRepository(db)
         self.panorama_repo = PanoramaRepository(db)
 
-    async def create_user(self, name, image):
+    async def create_lanterns(self, name, image):
         if not name.strip():
             raise ValidationError("Name is required")
 
@@ -41,17 +41,17 @@ class LanternService:
         return lantern_id
 
     async def get_recent_lanterns(self, current_lantern_id: str, limit: int = 20):
-        musics = await self.music_repo.find_recent_musics(limit)
+        recent_lanterns = await self.lantern_repo.find_recent_lanterns(limit)
         lanterns = []
 
-        for idx, music in enumerate(musics, start=1):
-            user = await self.lantern_repo.find_by_lantern_id(music["lantern_id"])
+        for lantern_doc in recent_lanterns:
+            music = await self.music_repo.find_music_by_lantern_id(lantern_doc["lantern_id"])
 
             lantern = LanternListResponseModel(
-                id=idx,
-                owner_name=user["user_name"] if user else "Unknown",
-                emotion=music.get("prompt", "unknown"),
-                is_current_lantern=(music["lantern_id"] == current_lantern_id)
+                lantern_id=lantern_doc["lantern_id"],
+                owner_name=lantern_doc["user_name"],
+                emotion=music.get("prompt", "unknown") if music else "unknown",
+                is_current_lantern=(lantern_doc["lantern_id"] == current_lantern_id)
             )
             lanterns.append(lantern)
 
@@ -73,7 +73,8 @@ class LanternService:
             is_current_lantern=(lantern_id == current_lantern_id)
         )
 
-    async def _save_file(self, image):
+    @staticmethod
+    async def _save_file(image):
         original_filename = image.filename
         file_extension = os.path.splitext(original_filename)[1]
         saved_filename = f"{uuid4()}{file_extension}"
