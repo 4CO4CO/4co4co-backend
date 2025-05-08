@@ -17,7 +17,6 @@ class LanternService:
 
             lantern = LanternListResponseModel(
                 id=idx,
-                title=music.get("prompt", "Untitled"),
                 owner_name=user["name"] if user else "Unknown",
                 emotion=music.get("prompt", "unknown"),
                 is_current_user=(music["user_key"] == current_user_key)
