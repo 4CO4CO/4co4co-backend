@@ -2,7 +2,8 @@ from pydantic import BaseModel
 
 
 class LanternDetailResponseModel(BaseModel):
-    id: int
+    lantern_id: str
     owner_name: str
     panorama: str
     background_sound: str
+    is_current_lantern: bool

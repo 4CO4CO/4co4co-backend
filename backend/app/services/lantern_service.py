@@ -40,36 +40,37 @@ class LanternService:
         await self.lantern_repo.insert_lantern(user_model.model_dump(exclude={'id'}))
         return lantern_id
 
-    async def get_recent_lanterns(self, current_user_key: str, limit: int = 20):
+    async def get_recent_lanterns(self, current_lantern_id: str, limit: int = 20):
         musics = await self.music_repo.find_recent_musics(limit)
         lanterns = []
 
         for idx, music in enumerate(musics, start=1):
-            user = await self.lantern_repo.find_by_lantern_id(music["user_key"])
+            user = await self.lantern_repo.find_by_lantern_id(music["lantern_id"])
 
             lantern = LanternListResponseModel(
                 id=idx,
-                owner_name=user["name"] if user else "Unknown",
+                owner_name=user["user_name"] if user else "Unknown",
                 emotion=music.get("prompt", "unknown"),
-                is_current_user=(music["user_key"] == current_user_key)
+                is_current_lantern=(music["lantern_id"] == current_lantern_id)
             )
             lanterns.append(lantern)
 
         return lanterns
 
-    async def get_lantern_detail(self, lantern_id: str):
-        music = await self.music_repo.find_music_by_id(lantern_id)
-        if not music:
+    async def get_lantern_detail(self, lantern_id: str, current_lantern_id: str):
+        lantern = await self.lantern_repo.find_by_lantern_id(lantern_id)
+        if not lantern:
             return None
 
-        user = await self.lantern_repo.find_by_lantern_id(music["user_key"])
-        panorama = await self.panorama_repo.find_panorama_by_user_key(music["user_key"])
+        music = await self.music_repo.find_music_by_lantern_id(lantern_id)
+        panorama = await self.panorama_repo.find_panorama_by_lantern_id(lantern_id)
 
         return LanternDetailResponseModel(
-            id=str(music["_id"]),
-            owner_name=user["name"] if user else "Unknown",
+            lantern_id=lantern_id,
+            owner_name=lantern["user_name"] if lantern else "Unknown",
             panorama=panorama["s3_path"] if panorama else "",
-            background_sound=music["s3_path"] if music else ""
+            background_sound=music["s3_path"] if music else "",
+            is_current_lantern=(lantern_id == current_lantern_id)
         )
 
     async def _save_file(self, image):

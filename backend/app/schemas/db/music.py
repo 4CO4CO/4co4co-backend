@@ -9,7 +9,7 @@ class MusicDBModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: Optional[ObjectId] = Field(default=None, alias="_id")
-    user_key: str
+    lantern_id: str
     prompt: str
     s3_path: str
     created_at: datetime
