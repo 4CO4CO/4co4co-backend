@@ -1,12 +1,12 @@
-from app.core.exceptions import DatabaseError
+from app.core.exceptions.types import DatabaseError
 
 
 class PanoramaRepository:
     def __init__(self, db):
-        self.collection = db.panoramas
+        self.collection = db.panorama
 
-    async def find_panorama_by_user_key(self, user_key):
+    async def find_panorama_by_lantern_id(self, lantern_id):
         try:
-            return await self.collection.find_one({"user_key": user_key})
+            return await self.collection.find_one({"lantern_id": lantern_id})
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e
