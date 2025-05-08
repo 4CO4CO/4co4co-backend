@@ -5,9 +5,9 @@ class MusicRepository:
     def __init__(self, db):
         self.collection = db.music
 
-    async def save_user_music(self, music_model):
+    async def save_user_music(self, music_doc):
         try:
-            result = await self.collection.insert_one(music_model.model_dump(by_alias=True, exclude_none=True))
+            result = await self.collection.insert_one(music_doc)
             return str(result.inserted_id)
         except Exception as e:
             raise DatabaseError(f"Database insert failed: {e}") from e

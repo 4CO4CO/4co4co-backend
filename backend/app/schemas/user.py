@@ -12,6 +12,9 @@ class UserDBModel(BaseModel):
     user_key: str
     name: str
     image_path: str
+    original_filename: Optional[str] = None
+    file_extension: Optional[str] = None
+    file_size: Optional[int] = None
     created_at: datetime
 
     @field_serializer('id')
