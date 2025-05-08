@@ -5,9 +5,9 @@ class MusicRepository:
     def __init__(self, db):
         self.collection = db.music
 
-    async def save_user_music(self, music_model):
+    async def save_user_music(self, music_doc):
         try:
-            result = await self.collection.insert_one(music_model.model_dump(by_alias=True, exclude_none=True))
+            result = await self.collection.insert_one(music_doc)
             return str(result.inserted_id)
         except Exception as e:
             raise DatabaseError(f"Database insert failed: {e}") from e
@@ -18,3 +18,11 @@ class MusicRepository:
             return [doc async for doc in cursor]
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e
+
+    async def find_recent_musics(self, limit: int = 20):
+        try:
+            cursor = self.collection.find().sort("created_at", -1).limit(limit)
+            return [doc async for doc in cursor]
+        except Exception as e:
+            raise DatabaseError(f"Database query failed: {e}") from e
+

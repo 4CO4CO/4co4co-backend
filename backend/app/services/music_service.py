@@ -30,7 +30,7 @@ class MusicService:
             created_at=datetime.utcnow()
         )
 
-        await self.music_repo.save_user_music(music_model)
+        await self.music_repo.save_user_music(music_model.model_dump(exclude={"id"}))
         return result
 
     async def call_ai_server(self, prompt: str):

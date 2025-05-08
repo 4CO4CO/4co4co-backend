@@ -12,6 +12,13 @@ class UserRepository:
         except Exception as e:
             raise DatabaseError(f"Database insert failed: {e}") from e
 
+    async def find_all_users(self):
+        try:
+            cursor = self.collection.find().sort("created_at", -1)
+            return [doc async for doc in cursor]
+        except Exception as e:
+            raise DatabaseError(f"Database query failed: {e}") from e
+
     async def find_user_by_key(self, user_key):
         try:
             user = await self.collection.find_one({"user_key": user_key})
