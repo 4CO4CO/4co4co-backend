@@ -25,3 +25,9 @@ class LanternRepository:
             return [doc async for doc in cursor]
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e
+
+    async def count_documents(self, filter_dict):
+        try:
+            return await self.collection.count_documents(filter_dict)
+        except Exception as e:
+            raise DatabaseError(f"Database count failed: {e}") from e
