@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class LanternListResponseModel(BaseModel):
-    id: int
+    lantern_id: str
     owner_name: str
     emotion: str
-    is_current_user: bool
+    is_current_lantern: bool
