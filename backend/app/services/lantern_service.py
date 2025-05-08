@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from uuid import uuid4
 
-from app.core.exceptions.types import FileSaveError, ValidationError
+from app.core.exceptions.types import FileSaveError, ValidationError, NotFoundError
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
 from app.repositories.panorama_repository import PanoramaRepository
@@ -41,6 +41,11 @@ class LanternService:
         return lantern_id
 
     async def get_recent_lanterns(self, current_lantern_id: str, limit: int = 20):
+        if current_lantern_id:
+            count = await self.lantern_repo.count_documents({"lantern_id": current_lantern_id})
+            if count == 0:
+                raise NotFoundError(f"Current Lantern ID {current_lantern_id} not found.")
+
         recent_lanterns = await self.lantern_repo.find_recent_lanterns(limit)
         lanterns = []
 
@@ -58,16 +63,21 @@ class LanternService:
         return lanterns
 
     async def get_lantern_detail(self, lantern_id: str, current_lantern_id: str):
+        if current_lantern_id:
+            count = await self.lantern_repo.count_documents({"lantern_id": current_lantern_id})
+            if count == 0:
+                raise NotFoundError(f"Current Lantern ID {current_lantern_id} not found.")
+
         lantern = await self.lantern_repo.find_by_lantern_id(lantern_id)
         if not lantern:
-            return None
+            raise NotFoundError(f"Lantern ID {lantern_id} not found.")
 
         music = await self.music_repo.find_music_by_lantern_id(lantern_id)
         panorama = await self.panorama_repo.find_panorama_by_lantern_id(lantern_id)
 
         return LanternDetailResponseModel(
             lantern_id=lantern_id,
-            owner_name=lantern["user_name"] if lantern else "Unknown",
+            owner_name=lantern["user_name"],
             panorama=panorama["s3_path"] if panorama else "",
             background_sound=music["s3_path"] if music else "",
             is_current_lantern=(lantern_id == current_lantern_id)
