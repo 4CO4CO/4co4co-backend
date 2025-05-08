@@ -1,3 +1,5 @@
+from bson import ObjectId
+
 from app.core.exceptions import DatabaseError
 
 
@@ -26,3 +28,8 @@ class MusicRepository:
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e
 
+    async def find_music_by_id(self, music_id: str):
+        try:
+            return await self.collection.find_one({"_id": ObjectId(music_id)})
+        except Exception as e:
+            raise DatabaseError(f"Database query failed: {e}") from e

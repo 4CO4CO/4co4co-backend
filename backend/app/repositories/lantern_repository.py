@@ -1,25 +1,25 @@
 from app.core.exceptions import DatabaseError
 
 
-class UserRepository:
+class LanternRepository:
     def __init__(self, db):
         self.collection = db.users
 
-    async def insert_user(self, user_doc):
+    async def insert_lantern(self, user_doc):
         try:
             result = await self.collection.insert_one(user_doc)
             return result
         except Exception as e:
             raise DatabaseError(f"Database insert failed: {e}") from e
 
-    async def find_all_users(self):
+    async def find_all_lanterns(self):
         try:
             cursor = self.collection.find().sort("created_at", -1)
             return [doc async for doc in cursor]
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e
 
-    async def find_user_by_key(self, user_key):
+    async def find_by_lantern_id(self, user_key):
         try:
             user = await self.collection.find_one({"user_key": user_key})
             return user

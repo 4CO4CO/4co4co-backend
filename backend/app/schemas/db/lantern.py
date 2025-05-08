@@ -5,12 +5,12 @@ from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict, field_serializer
 
 
-class UserDBModel(BaseModel):
+class LanternDBModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: Optional[ObjectId] = Field(default=None, alias="_id")
-    user_key: str
-    name: str
+    lantern_id: str  # UUID
+    user_name: str
     image_path: str
     original_filename: Optional[str] = None
     file_extension: Optional[str] = None
