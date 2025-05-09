@@ -10,7 +10,11 @@ from app.core.config.settings import settings
 from app.core.db.database import get_mongo_sync_client
 from app.schemas.db.panorama import PanoramaDBModel
 
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+redis_client = redis.Redis(
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    db=0
+)
 
 
 @celery_app.task
@@ -18,7 +22,8 @@ def generate_panorama_task(prompt, lantern_id, image_path):
     if settings.USE_MOCK:
         print(f"[MOCK] Sleeping for 3 seconds to simulate processing...")
         time.sleep(3)
-        panorama_path = f"mock_output/outpainted_{image_path.split('/')[-1]}"
+        panorama_path = f"https://{settings.AWS_S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/panorama/mock-panorama.png"
+
     else:
         with open(image_path, "rb") as img_file:
             response = requests.post(
@@ -30,14 +35,12 @@ def generate_panorama_task(prompt, lantern_id, image_path):
         result = response.json()
         panorama_path = result["output_path"]
 
-    s3_path = f"https://s3.bucket/{panorama_path}"
-
     # MongoDB 저장
     mongo_client = get_mongo_sync_client()
     panorama_collection = mongo_client["panorama"]
     panorama_doc = PanoramaDBModel(
         lantern_id=lantern_id,
-        s3_path=s3_path,
+        s3_path=panorama_path,
         created_at=datetime.utcnow()
     )
     insert_result = panorama_collection.insert_one(panorama_doc.model_dump(by_alias=True, exclude={"id"}))
@@ -47,9 +50,9 @@ def generate_panorama_task(prompt, lantern_id, image_path):
     redis_message = json.dumps({
         "lantern_id": lantern_id,
         "status": "completed",
-        "s3_url": s3_path
+        "s3_url": panorama_path
     })
     redis_client.publish("lantern_updates", redis_message)
     print(f"[Redis] Published update for lantern_id: {lantern_id}")
 
-    return {"message": "Panorama generated and saved", "s3_url": s3_path}
+    return {"message": "Panorama generated and saved", "s3_url": panorama_path}

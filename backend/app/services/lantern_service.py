@@ -1,8 +1,8 @@
-import os
 from datetime import datetime
 from uuid import uuid4
 
 from app.core.exceptions.types import FileSaveError, ValidationError, NotFoundError
+from app.core.s3 import upload_file_to_s3
 from app.core.tasks.panorama_tasks import generate_panorama_task
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
@@ -10,9 +10,6 @@ from app.repositories.panorama_repository import PanoramaRepository
 from app.schemas.db.lantern import LanternDBModel
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_list_response import LanternListResponseModel
-
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 class LanternService:
@@ -25,7 +22,7 @@ class LanternService:
         if not name.strip():
             raise ValidationError("Name is required")
 
-        file_path, original_filename, file_extension, file_size = await self._save_file(image)
+        file_path, original_filename, file_extension, file_size = await self._upload_image_to_s3(image)
         lantern_id = str(uuid4())
 
         user_model = LanternDBModel(
@@ -89,20 +86,18 @@ class LanternService:
         )
 
     @staticmethod
-    async def _save_file(image):
+    async def _upload_image_to_s3(image):
         original_filename = image.filename
-        file_extension = os.path.splitext(original_filename)[1]
-        saved_filename = f"{uuid4()}{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, saved_filename)
+        file_extension = original_filename.split('.')[-1]
 
         try:
-            content = await image.read()
-            file_size = len(content)
-            await image.seek(0)
+            file_path, file_size = await upload_file_to_s3(image, folder="lanterns")
+            if file_path is None:
+                raise FileSaveError("S3 upload failed")
 
-            with open(file_path, "wb") as buffer:
-                buffer.write(content)
         except Exception as e:
-            raise FileSaveError(f"File saving failed: {e}") from e
+            raise FileSaveError(f"File upload failed: {e}") from e
 
         return file_path, original_filename, file_extension, file_size
+
+
