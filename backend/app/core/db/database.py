@@ -2,9 +2,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import MongoClient
 
-from app.core.logging.logger import get_logger
 from app.core.config.settings import settings
+from app.core.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -43,3 +44,13 @@ async def lifespan(app: FastAPI):
 
 def get_mongo_client(request: Request):
     return request.app.database
+
+
+def get_mongo_sync_client():
+    client = MongoClient(
+        settings.MONGO_URI,
+        maxPoolSize=settings.MONGO_MAX_POOL_SIZE,
+        minPoolSize=settings.MONGO_MIN_POOL_SIZE,
+        serverSelectionTimeoutMS=settings.MONGO_SERVER_SELECTION_TIMEOUT_MS
+    )
+    return client[settings.MONGO_DB]

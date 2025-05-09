@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     MONGO_SERVER_SELECTION_TIMEOUT_MS: int = Field(30000, description="Server selection timeout in milliseconds")
 
     API_PREFIX: str = Field("/api/v1", description="Base API prefix")
+    USE_MOCK: bool = Field(True, description="Use mock mode for testing AI server requests")
 
     class Config:
         env_file = ".env"

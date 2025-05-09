@@ -3,6 +3,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from app.core.exceptions.types import FileSaveError, ValidationError, NotFoundError
+from app.core.tasks.panorama_tasks import generate_panorama_task
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
 from app.repositories.panorama_repository import PanoramaRepository
@@ -38,6 +39,10 @@ class LanternService:
         )
 
         await self.lantern_repo.insert_lantern(user_model.model_dump(exclude={'id'}))
+
+        # Celery 비동기 작업 실행 추가
+        generate_panorama_task.delay(prompt=name, lantern_id=lantern_id, image_path=file_path)
+
         return lantern_id
 
     async def get_recent_lanterns(self, current_lantern_id: str, limit: int = 20):
