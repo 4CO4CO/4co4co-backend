@@ -29,8 +29,8 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads"):
             s3_file_key
         )
 
-        file_url = f"https://{settings.AWS_S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_file_key}"
-        return file_url, file_size
+        file_path = f"https://{settings.AWS_S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_file_key}"
+        return file_path, file_size
 
     except ClientError as e:
         print(e)

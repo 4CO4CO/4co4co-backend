@@ -22,13 +22,13 @@ class LanternService:
         if not name.strip():
             raise ValidationError("Name is required")
 
-        file_url, original_filename, file_extension, file_size = await self._upload_image_to_s3(image)
+        file_path, original_filename, file_extension, file_size = await self._upload_image_to_s3(image)
         lantern_id = str(uuid4())
 
         user_model = LanternDBModel(
             lantern_id=lantern_id,
             user_name=name,
-            image_path=file_url,
+            image_path=file_path,
             original_filename=original_filename,
             file_extension=file_extension,
             file_size=file_size,
@@ -91,13 +91,13 @@ class LanternService:
         file_extension = original_filename.split('.')[-1]
 
         try:
-            file_url, file_size = await upload_file_to_s3(image, folder="lanterns")
-            if file_url is None:
+            file_path, file_size = await upload_file_to_s3(image, folder="lanterns")
+            if file_path is None:
                 raise FileSaveError("S3 upload failed")
 
         except Exception as e:
             raise FileSaveError(f"File upload failed: {e}") from e
 
-        return file_url, original_filename, file_extension, file_size
+        return file_path, original_filename, file_extension, file_size
 
 

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     AWS_REGION: str = Field("ap-northeast-2", description="AWS Region for S3")
     AWS_S3_BUCKET_NAME: str = Field(..., description="AWS S3 Bucket Name")
 
+    # Redis
+    REDIS_URL: str = Field(..., description="Redis URL")
+    REDIS_HOST: str = Field(..., description="Redis host")
+    REDIS_PORT: int = Field(..., description="Redis port")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

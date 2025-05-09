@@ -1,9 +1,11 @@
 from celery import Celery
 
+from app.core.config.settings import settings
+
 celery_app = Celery(
     "backend",
-    broker="redis://localhost:6379/0",
-    backend="redis://localhost:6379/0"
+    broker=settings.REDIS_URL,
+    backend=settings.REDIS_URL
 )
 
 celery_app.conf.update(
@@ -14,5 +16,5 @@ celery_app.conf.update(
     enable_utc=True,
 )
 
-from app.core.tasks import panorama_tasks
-from app.core.config import settings
+import app.core.tasks.panorama_tasks
+
