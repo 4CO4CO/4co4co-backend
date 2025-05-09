@@ -39,7 +39,7 @@ class LanternService:
         await self.lantern_repo.insert_lantern(user_model.model_dump(exclude={'id'}))
 
         # Celery 비동기 작업 실행 추가
-        # generate_panorama_task.delay(prompt=name, lantern_id=lantern_id, image_path=file_path)
+        generate_panorama_task.delay(prompt=name, lantern_id=lantern_id, image_path=file_path)
 
         return lantern_id
 
