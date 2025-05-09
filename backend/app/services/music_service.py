@@ -6,6 +6,7 @@ from app.core.exceptions.types import NotFoundError, AIResponseProcessingError
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
 from app.schemas.db.music import MusicDBModel
+from app.core.config.settings import settings
 
 
 class MusicService:
@@ -19,7 +20,12 @@ class MusicService:
         if not user:
             raise NotFoundError(f"Lantern ID {lantern_id} not found.")
 
-        result = await self.call_ai_server(prompt)
+        # .env에서 USE_MOCK 값 확인
+        if settings.USE_MOCK:
+            result = await self.mock_ai_client()
+        else:
+            result = await self.call_ai_server(prompt)
+
         file_path = result['data'].get('file_path')
         if not file_path:
             raise AIResponseProcessingError("No file path returned from AI")
@@ -50,17 +56,12 @@ class MusicService:
 
         return result
 
-    # ⚠️ [발표용 / 로컬 테스트용 MOCK]
-    # 현재 로컬 환경에서는 GPU가 없어서 AI 서버 호출을 돌리기 어렵기 때문에
-    # 아래 mock_ai_client 메서드를 준비함.
-    # 이 메서드는 실제 서비스 배포 시 삭제 예정이며,
-    # 배포 환경에서는 진짜 AI 서버 (call_ai_server)와 연결되어야 함.
     @staticmethod
-    async def mock_ai_client(prompt: str):
+    async def mock_ai_client():
         return {
             "status": "success",
             "message": "Mocked AI response",
             "data": {
-                "file_path": f"s3://mock-bucket/{prompt.replace(' ', '_')}.mp3"
+                "file_path": f"https://4co4co-memory-assets.s3.ap-northeast-2.amazonaws.com/music/mock-music.wav"
             }
         }
