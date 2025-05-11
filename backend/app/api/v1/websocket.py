@@ -43,9 +43,11 @@ async def websocket_endpoint(websocket: WebSocket, lantern_id: str):
 
     except WebSocketDisconnect:
         print(f"[WebSocket] Disconnected: {lantern_id}")
-        active_connections[lantern_id].remove(websocket)
+    finally:
+        if lantern_id in active_connections and websocket in active_connections[lantern_id]:
+            active_connections[lantern_id].remove(websocket)
         if not active_connections[lantern_id]:
             del active_connections[lantern_id]
-    finally:
+
         await pubsub.unsubscribe("lantern_updates")
         await pubsub.close()
