@@ -6,5 +6,5 @@ api_router = APIRouter()
 
 api_router.include_router(music_api.router, tags=["music"])
 api_router.include_router(lantern_api.router, tags=["lanterns"])
-api_router.include_router(websocket.router)
+api_router.include_router(websocket.router, prefix="/ws")
 

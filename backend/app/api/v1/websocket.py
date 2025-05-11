@@ -17,7 +17,7 @@ redis_subscriber = aioredis.Redis(
 active_connections: dict[str, list[WebSocket]] = {}
 
 
-@router.websocket("/ws/lantern/{lantern_id}")
+@router.websocket("/lanterns/{lantern_id}")
 async def websocket_endpoint(websocket: WebSocket, lantern_id: str):
     await websocket.accept()
     print(f"[WebSocket] Connected: {lantern_id}")
