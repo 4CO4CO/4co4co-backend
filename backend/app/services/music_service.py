@@ -6,7 +6,6 @@ from app.core.exceptions.types import NotFoundError, AIResponseProcessingError
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
 from app.schemas.db.music import MusicDBModel
-from app.core.config.settings import settings
 
 
 class MusicService:
