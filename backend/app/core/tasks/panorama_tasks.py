@@ -34,27 +34,20 @@ def publish_status(lantern_id: str, status: str, step: str, extra: dict = None):
 def generate_panorama_task(prompt, lantern_id, image_path):
     publish_status(lantern_id, "started", "Task started")
 
-    if settings.USE_MOCK:
-        publish_status(lantern_id, "processing", "Mock processing panorama")
-        print(f"[MOCK] Sleeping for 3 seconds to simulate processing...")
-        time.sleep(3)
-        panorama_path = f"https://{settings.AWS_S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/panorama/mock-panorama.png"
-
-    else:
-        publish_status(lantern_id, "processing", "Sending image to AI server")
-        try:
-            with open(image_path, "rb") as img_file:
-                response = requests.post(
-                    "http://localhost:8001/api/v1/outpaint",
-                    files={"image": img_file},
-                    data={"prompt": prompt}
-                )
-            response.raise_for_status()
-            result = response.json()
-            panorama_path = result["output_path"]
-        except Exception as e:
-            publish_status(lantern_id, "failed", "Error during AI processing", {"error": str(e)})
-            raise
+    publish_status(lantern_id, "processing", "Sending image to AI server")
+    try:
+        with open(image_path, "rb") as img_file:
+            response = requests.post(
+                "http://localhost:8001/api/v1/outpaint",
+                files={"image": img_file},
+                data={"prompt": prompt}
+            )
+        response.raise_for_status()
+        result = response.json()
+        panorama_path = result["output_path"]
+    except Exception as e:
+        publish_status(lantern_id, "failed", "Error during AI processing", {"error": str(e)})
+        raise
 
     publish_status(lantern_id, "saving_db", "Saving result to MongoDB")
     try:
@@ -67,6 +60,7 @@ def generate_panorama_task(prompt, lantern_id, image_path):
         )
         insert_result = panorama_collection.insert_one(panorama_doc.model_dump(by_alias=True, exclude={"id"}))
         print(f"[DB] Inserted panorama document with ID: {insert_result.inserted_id}")
+
     except Exception as e:
         publish_status(lantern_id, "failed", "Error saving to MongoDB", {"error": str(e)})
         raise

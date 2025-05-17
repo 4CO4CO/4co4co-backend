@@ -12,7 +12,6 @@ class Settings(BaseSettings):
 
     # API 설정
     API_PREFIX: str = Field("/api/v1", description="Base API prefix")
-    USE_MOCK: bool = Field(True, description="Use mock mode for testing AI server requests")
 
     # AWS S3 설정 추가
     AWS_ACCESS_KEY_ID: str = Field(..., description="AWS Access Key ID for S3")

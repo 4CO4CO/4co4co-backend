@@ -20,11 +20,7 @@ class MusicService:
         if not user:
             raise NotFoundError(f"Lantern ID {lantern_id} not found.")
 
-        # .env에서 USE_MOCK 값 확인
-        if settings.USE_MOCK:
-            result = await self.mock_ai_client()
-        else:
-            result = await self.call_ai_server(prompt)
+        result = await self.call_ai_server(prompt)
 
         file_path = result['data'].get('file_path')
         if not file_path:
@@ -56,12 +52,3 @@ class MusicService:
 
         return result
 
-    @staticmethod
-    async def mock_ai_client():
-        return {
-            "status": "success",
-            "message": "Mocked AI response",
-            "data": {
-                "file_path": f"https://4co4co-memory-assets.s3.ap-northeast-2.amazonaws.com/music/mock-music.wav"
-            }
-        }
