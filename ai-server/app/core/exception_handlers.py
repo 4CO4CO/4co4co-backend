@@ -11,5 +11,6 @@ async def ai_server_error_handler(request: Request, exc: AIServerError):
     )
     return JSONResponse(
         status_code=exc.status_code,
-        content=response.dict()
+        content=response.model_dump()
     )
+

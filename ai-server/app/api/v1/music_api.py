@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.core.response import success_response
