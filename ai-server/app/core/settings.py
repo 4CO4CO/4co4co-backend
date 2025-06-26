@@ -1,18 +1,24 @@
+from pydantic_settings import BaseSettings
 from pydantic import Field
-from pydantic.v1 import BaseSettings
 
 
 class Settings(BaseSettings):
-    WIDTH: int = Field(1920, description="Canvas width")
-    HEIGHT: int = Field(1080, description="Canvas height")
-    DEVICE: str = Field("cuda", description="Computation device")
-    PROMPT_SUFFIX: str = Field(", high quality, 4k", description="Prompt suffix")
-    RESIZE_OPTION: str = Field("Full", description="Resize option")
+    AWS_ACCESS_KEY_ID: str = Field(
+        ..., min_length=16, max_length=128, description="AWS Access Key ID"
+    )
+    AWS_SECRET_ACCESS_KEY: str = Field(
+        ..., min_length=16, description="AWS Secret Access Key"
+    )
+    AWS_REGION: str = Field(
+        ..., pattern=r'^[a-z0-9\-]+$', description="AWS Region (e.g., ap-northeast-2)"
+    )
+    AWS_S3_BUCKET_NAME: str = Field(
+        ..., min_length=3, max_length=63, description="S3 Bucket Name"
+    )
 
     class Config:
         env_file = ".env"
-        case_sensitive = True
-        env_file_encoding = "utf-8"
+        extra = "forbid"
 
 
 settings = Settings()
