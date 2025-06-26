@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+from typing import List
 from starlette.concurrency import run_in_threadpool
 
 from app.core.response import success_response
@@ -8,14 +9,19 @@ from app.music.run_musicgen import generate_music
 router = APIRouter()
 
 
-class PromptRequest(BaseModel):
-    prompt: str
+class MultiPromptRequest(BaseModel):
+    prompts: List[str]
 
 
-@router.post("/generate-music")
-async def generate_music_api(body: PromptRequest):
-    output_path = await run_in_threadpool(generate_music, body.prompt)
+@router.post("/generate-multiple-music")
+async def generate_multiple_music_api(body: MultiPromptRequest):
+    music_urls = []
+
+    for prompt in body.prompts:
+        output = await run_in_threadpool(generate_music, prompt)
+        music_urls.append(output["s3_url"])
+
     return success_response(
-        data={"file_path": output_path["s3_url"]},
-        message="Music generated"
+        data={"music_urls": music_urls},
+        message="Multiple music generated"
     )
