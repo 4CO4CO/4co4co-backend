@@ -11,9 +11,10 @@ def success_response(data: Any, message: str = "Success"):
     )
 
 
-def error_response(message: str = "An error occurred"):
-    return ResponseModel(
-        status="error",
-        message=message,
-        data=None
-    )
+def error_response(message: str, error_code: str = "UNKNOWN_ERROR"):
+    return {
+        "status": "error",
+        "error_code": error_code,
+        "message": message,
+    }
+
