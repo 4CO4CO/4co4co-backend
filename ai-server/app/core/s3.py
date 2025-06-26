@@ -25,7 +25,9 @@ def upload_file_to_s3(local_path: str, folder: str = "music", content_type: str 
     :param content_type: MIME 타입
     :return: dict(s3_url, file_size)
     """
-    s3_key = f"{folder}/{uuid4()}.wav"
+    file_extension = os.path.splitext(local_path)[1] or '.wav'
+    s3_key = f"{folder}/{uuid4()}{file_extension}"
+    
     try:
         s3_client.upload_file(
             Filename=local_path,
@@ -41,4 +43,3 @@ def upload_file_to_s3(local_path: str, folder: str = "music", content_type: str 
 
     except (BotoCoreError, ClientError) as e:
         raise AIServerError(f"S3 upload failed: {str(e)}") from e
-    
