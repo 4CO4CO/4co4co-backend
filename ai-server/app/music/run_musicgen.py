@@ -1,10 +1,8 @@
+import torch
+from audiocraft.models import MusicGen
+from audiocraft.data.audio import audio_write
 import tempfile
 from pathlib import Path
-
-import torch
-
-from audiocraft.data.audio import audio_write
-from audiocraft.models import MusicGen
 
 # 디바이스 설정
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -29,3 +27,4 @@ def generate_music(prompt: str, duration: int = 10) -> str:
             strategy="loudness"
         )
         return "success"
+

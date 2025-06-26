@@ -6,7 +6,7 @@ from app.core.exceptions.types import NotFoundError, AIResponseProcessingError
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
 from app.schemas.db.music import MusicDBModel
-from app.core.config.settings import settings
+from app.core.config import settings
 
 
 class MusicService:
@@ -20,29 +20,28 @@ class MusicService:
         if not user:
             raise NotFoundError(f"Lantern ID {lantern_id} not found.")
 
-        # .env에서 USE_MOCK 값 확인
-        if settings.USE_MOCK:
+        if True:
             result = await self.mock_ai_client()
         else:
             result = await self.call_ai_server(prompt)
 
-        file_path = result['data'].get('file_path')
-        if not file_path:
-            raise AIResponseProcessingError("No file path returned from AI")
+            file_path = result['data'].get('file_path')
+            if not file_path:
+                raise AIResponseProcessingError("No file path returned from AI")
 
-        music_model = MusicDBModel(
-            lantern_id=lantern_id,
-            prompt=prompt,
-            s3_path=file_path,
-            created_at=datetime.utcnow()
-        )
+            music_model = MusicDBModel(
+                lantern_id=lantern_id,
+                prompt=prompt,
+                s3_path=file_path,
+                created_at=datetime.utcnow()
+            )
 
-        await self.music_repo.save_music(music_model.model_dump(exclude={"id"}))
-        return result
+            await self.music_repo.save_music(music_model.model_dump(exclude={"id"}))
+            return result
 
     @staticmethod
     async def call_ai_server(prompt: str):
-        ai_server_url = "http://localhost:8001/api/v1/generate-music"
+        ai_server_url = settings.AI_SERVER_URL + "/generate-music"
         try:
             async with httpx.AsyncClient(timeout=1000.0) as client:
                 response = await client.post(ai_server_url, json={"prompt": prompt})
@@ -65,3 +64,4 @@ class MusicService:
                 "file_path": f"https://4co4co-memory-assets.s3.ap-northeast-2.amazonaws.com/music/mock-music.wav"
             }
         }
+
