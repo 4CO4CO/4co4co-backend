@@ -23,7 +23,7 @@ def generate_music(prompt: str, duration: int = 10) -> dict:
     try:
         wav = model.generate([prompt], progress=False)
     except Exception as e:
-        raise GenerationError(f"Music generation failed: {str(e)}")
+        raise GenerationError(f"Music generation failed: {str(e)}") from e
 
     tensor = wav[0].cpu()
 
