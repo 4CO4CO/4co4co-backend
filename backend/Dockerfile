@@ -1,5 +1,5 @@
 # Dockerfile
-FROM python:3.10
+FROM python:3.10-slim
 
 # 작업 디렉토리 생성
 WORKDIR /app
