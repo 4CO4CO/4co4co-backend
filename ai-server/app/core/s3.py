@@ -40,4 +40,5 @@ def upload_file_to_s3(local_path: str, folder: str = "music", content_type: str 
         return {"s3_url": s3_url, "file_size": file_size}
 
     except (BotoCoreError, ClientError) as e:
-        raise AIServerError(f"S3 upload failed: {str(e)}")
+        raise AIServerError(f"S3 upload failed: {str(e)}") from e
+    
