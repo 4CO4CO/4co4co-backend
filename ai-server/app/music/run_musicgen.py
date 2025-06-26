@@ -1,12 +1,12 @@
 import os
 import re
 import tempfile
-from audiocraft.models import MusicGen
 
 import torchaudio
 
-from app.core.exceptions import AIServerError, GenerationError
+from app.core.exceptions import GenerationError
 from app.core.s3 import upload_file_to_s3  # ✅ 여기서 import
+from audiocraft.models import MusicGen
 
 # 모델 로딩
 model = MusicGen.get_pretrained("facebook/musicgen-small")

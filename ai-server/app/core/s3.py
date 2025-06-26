@@ -27,7 +27,7 @@ def upload_file_to_s3(local_path: str, folder: str = "music", content_type: str 
     """
     file_extension = os.path.splitext(local_path)[1] or '.wav'
     s3_key = f"{folder}/{uuid4()}{file_extension}"
-    
+
     try:
         s3_client.upload_file(
             Filename=local_path,
