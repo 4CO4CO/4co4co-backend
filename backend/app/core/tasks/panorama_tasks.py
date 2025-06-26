@@ -34,7 +34,7 @@ def publish_status(lantern_id: str, status: str, step: str, extra: dict = None):
 def generate_panorama_task(prompt, lantern_id, image_path):
     publish_status(lantern_id, "started", "Task started")
 
-    if settings.USE_MOCK:
+    if True:
         publish_status(lantern_id, "processing", "Mock processing panorama")
         print(f"[MOCK] Sleeping for 3 seconds to simulate processing...")
         time.sleep(3)
@@ -44,8 +44,9 @@ def generate_panorama_task(prompt, lantern_id, image_path):
         publish_status(lantern_id, "processing", "Sending image to AI server")
         try:
             with open(image_path, "rb") as img_file:
+                ai_server_url = settings.AI_SERVER_URL + "/outpaint"
                 response = requests.post(
-                    "http://localhost:8001/api/v1/outpaint",
+                    ai_server_url,
                     files={"image": img_file},
                     data={"prompt": prompt}
                 )
@@ -67,6 +68,7 @@ def generate_panorama_task(prompt, lantern_id, image_path):
         )
         insert_result = panorama_collection.insert_one(panorama_doc.model_dump(by_alias=True, exclude={"id"}))
         print(f"[DB] Inserted panorama document with ID: {insert_result.inserted_id}")
+
     except Exception as e:
         publish_status(lantern_id, "failed", "Error saving to MongoDB", {"error": str(e)})
         raise
