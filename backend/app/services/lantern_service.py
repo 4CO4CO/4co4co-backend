@@ -10,7 +10,7 @@ from app.repositories.music_repository import MusicRepository
 from app.repositories.panorama_repository import PanoramaRepository
 from app.schemas.db.lantern import LanternDBModel
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
-from app.schemas.response.lantern_list_response import LanternListResponseModel
+from app.schemas.response.lantern_response import LanternResponseModel
 
 
 class LanternService:
@@ -42,8 +42,8 @@ class LanternService:
         generate_panorama_task.delay(prompt=name, lantern_id=lantern_id, image_path=file_path)
 
         return lantern_id
-    def to_lantern_model(self, doc: dict, current_lantern_id: Optional[str]) -> LanternListResponseModel:
-        return LanternListResponseModel(
+    def to_lantern_model(self, doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
+        return LanternResponseModel(
             lantern_id=doc["lantern_id"],
             owner_name=doc["user_name"],
             is_current_lantern=(doc["lantern_id"] == current_lantern_id)

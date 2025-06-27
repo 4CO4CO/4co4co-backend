@@ -1,10 +1,13 @@
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
 
 from app.core.db.database import get_mongo_client
 from app.core.exceptions.types import ValidationError
 from app.core.response.response import success_response, error_response
+from app.schemas.response.lantern_response import LanternResponseModel
+from app.schemas.schemas import ResponseModel
+from app.schemas.swagger import error_400, error_404, error_500
 from app.services.lantern_service import LanternService
 
 router = APIRouter()
@@ -47,20 +50,21 @@ async def create_lanterns(
     lantern_id = await lantern_service.create_lanterns(name, image)
     return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")
 
+
 @router.get(
     "/lanterns",
+    response_model=ResponseModel[List[LanternResponseModel]],
     responses={
-        200: {"description": "Successfully retrieved lantern list"},
-        400: {"description": "Bad Request - Invalid current_lantern_id format"},
-        404: {"description": "Not Found - Lantern not found"},
-        422: {"description": "Unprocessable Entity - Missing or invalid query parameter"},
-        500: {"description": "Internal Server Error"}
+        200: {"description": "Lantern List"},
+        400: error_400,
+        404: error_404,
+        500: error_500
     }
 )
 async def get_lanterns(
         current_lantern_id: Optional[str] = Query(
             None,
-            description="현재 조회 중인 랜턴 ID",
+            description="현재 관람 중인 사용자의 랜턴 ID",
             regex=r"^[가-힣a-zA-Z0-9]+-[0-9]+$"
         ), db=Depends(get_mongo_client)
 ):
