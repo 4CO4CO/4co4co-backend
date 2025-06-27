@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    APP_ENV: str = "production"
+
     # MongoDB
     MONGO_URI: str = Field(...)
     MONGO_DB: str = Field(...)
