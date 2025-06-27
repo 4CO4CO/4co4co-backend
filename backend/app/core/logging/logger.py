@@ -16,6 +16,7 @@ def get_logger(name: str):
         logger.addHandler(stream_handler)
 
         # 파일 로그 핸들러
+        os.makedirs("logs", exist_ok=True)
         file_handler = logging.FileHandler("logs/app.log", encoding="utf-8")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
