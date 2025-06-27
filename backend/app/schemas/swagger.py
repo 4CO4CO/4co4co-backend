@@ -1,4 +1,3 @@
-from fastapi import status
 from app.schemas.schemas import ErrorResponseModel
 
 error_400 = {
