@@ -49,3 +49,12 @@ class AIResponseProcessingError(AppError):
 
     def __init__(self, message="AI response processing failed", error_code=None):
         super().__init__(message=message, error_code=error_code or self.error_code)
+
+
+class ForbiddenError(AppError):
+    """Raised when access to a resource is forbidden (e.g. private lantern)."""
+    status_code = 403
+    error_code = "FORBIDDEN"
+
+    def __init__(self, message="접근이 금지된 리소스입니다.", error_code=None):
+        super().__init__(message=message, error_code=error_code or self.error_code)

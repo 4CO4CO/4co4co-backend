@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from app.core.exceptions.types import FileSaveError, ValidationError, NotFoundError
+from app.core.exceptions.types import FileSaveError, ValidationError, NotFoundError, ForbiddenError
 from app.core.config.s3 import upload_file_to_s3
 from app.core.tasks.panorama_tasks import generate_panorama_task
 from app.repositories.lantern_repository import LanternRepository
@@ -77,6 +77,12 @@ class LanternService:
             raise NotFoundError(
                 message=f"Lantern ID {lantern_id} not found.",
                 error_code="LANTERN_NOT_FOUND"
+            )
+
+        if not lantern.get("is_public", False):
+            raise ForbiddenError(
+                message="This lantern is private.",
+                error_code="LANTERN_NOT_PUBLIC"
             )
 
         image_paths = [
