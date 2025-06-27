@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
 
 from app.core.db.database import get_mongo_client
@@ -45,7 +47,6 @@ async def create_lanterns(
     lantern_id = await lantern_service.create_lanterns(name, image)
     return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")
 
-
 @router.get(
     "/lanterns",
     responses={
@@ -57,7 +58,7 @@ async def create_lanterns(
     }
 )
 async def get_lanterns(
-    current_lantern_id: str = Query(...),
+    current_lantern_id: Optional[str] = Query(default=None),
     db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
