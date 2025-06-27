@@ -15,6 +15,7 @@ class LanternDBModel(BaseModel):
     original_filename: Optional[str] = None
     file_extension: Optional[str] = None
     file_size: Optional[int] = None
+    is_public: bool
     created_at: datetime
 
     @field_serializer('id')
