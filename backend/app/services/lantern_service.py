@@ -8,7 +8,7 @@ from app.core.tasks.panorama_tasks import generate_panorama_task
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository
 from app.repositories.panorama_repository import PanoramaRepository
-from app.schemas.db.lantern import LanternDBModel
+from app.schemas.db.lanterns import LanternsDBModel
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
 
@@ -26,7 +26,7 @@ class LanternService:
         file_path, original_filename, file_extension, file_size = await self._upload_image_to_s3(image)
         lantern_id = str(uuid4())
 
-        user_model = LanternDBModel(
+        user_model = LanternsDBModel(
             lantern_id=lantern_id,
             user_name=name,
             image_path=file_path,
