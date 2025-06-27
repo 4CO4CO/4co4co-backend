@@ -71,25 +71,27 @@ class LanternService:
 
         return [self.to_lantern_model(doc, current_lantern_id) for doc in docs]
 
-    async def get_lantern_detail(self, lantern_id: str, current_lantern_id: str):
-        if current_lantern_id:
-            count = await self.lantern_repo.count_documents({"lantern_id": current_lantern_id})
-            if count == 0:
-                raise NotFoundError(f"Current Lantern ID {current_lantern_id} not found.")
-
+    async def get_lantern_detail(self, lantern_id: str):
         lantern = await self.lantern_repo.find_by_lantern_id(lantern_id)
         if not lantern:
-            raise NotFoundError(f"Lantern ID {lantern_id} not found.")
+            raise NotFoundError(
+                message=f"Lantern ID {lantern_id} not found.",
+                error_code="LANTERN_NOT_FOUND"
+            )
 
-        music = await self.music_repo.find_music_by_lantern_id(lantern_id)
-        panorama = await self.panorama_repo.find_panorama_by_lantern_id(lantern_id)
+        image_paths = [
+            image["s3_path"] for image in lantern.get("images", []) if "s3_path" in image
+        ]
+
+        background_sounds = [
+            music["s3_path"] for music in lantern.get("musics", []) if "s3_path" in music
+        ]
 
         return LanternDetailResponseModel(
-            lantern_id=lantern_id,
+            lantern_id=lantern["lantern_id"],
             owner_name=lantern["user_name"],
-            panorama=panorama["s3_path"] if panorama else "",
-            background_sound=music["s3_path"] if music else "",
-            is_current_lantern=(lantern_id == current_lantern_id)
+            images=image_paths,
+            background_sounds=background_sounds
         )
 
     @staticmethod
