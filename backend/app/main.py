@@ -8,6 +8,7 @@ from app.core.db.database import lifespan
 from app.core.exceptions.handlers import validation_exception_handler, app_error_handler, \
     generic_exception_handler
 from app.core.exceptions.types import AppError
+from app.core.config.openapi import custom_openapi
 
 app = FastAPI(lifespan=lifespan)
 
@@ -29,4 +30,4 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(AppError, app_error_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
-
+app.openapi = lambda: custom_openapi(app)
