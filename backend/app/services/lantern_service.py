@@ -42,6 +42,7 @@ class LanternService:
         generate_panorama_task.delay(prompt=name, lantern_id=lantern_id, image_path=file_path)
 
         return lantern_id
+
     def to_lantern_model(self, doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
         return LanternResponseModel(
             lantern_id=doc["lantern_id"],

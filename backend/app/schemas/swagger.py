@@ -1,4 +1,4 @@
-from app.schemas.schemas import ErrorResponseModel
+from app.schemas.response.schemas import ErrorResponseModel
 
 error_400 = {
     "description": "INVALID_INPUT_FORMAT",

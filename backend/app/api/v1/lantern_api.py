@@ -6,7 +6,7 @@ from app.core.db.database import get_mongo_client
 from app.core.exceptions.types import ValidationError
 from app.core.response.response import success_response, error_response
 from app.schemas.response.lantern_response import LanternResponseModel
-from app.schemas.schemas import ResponseModel
+from app.schemas.response.schemas import ResponseModel
 from app.schemas.swagger import error_400, error_404, error_500
 from app.services.lantern_service import LanternService
 
