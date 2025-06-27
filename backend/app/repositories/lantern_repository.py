@@ -1,4 +1,6 @@
-from app.core.exceptions.types import DatabaseError
+from typing import Optional
+
+from app.core.exceptions.types import DatabaseError, NotFoundError
 
 
 class LanternRepository:
@@ -31,3 +33,19 @@ class LanternRepository:
             return await self.collection.count_documents(filter_dict)
         except Exception as e:
             raise DatabaseError(f"Database count failed: {e}") from e
+
+    async def find_random_lanterns(self, limit: int = 20, exclude_lantern_id: Optional[str] = None):
+        try:
+            match_stage = {"is_public": True}
+            if exclude_lantern_id:
+                match_stage["lantern_id"] = {"$ne": exclude_lantern_id}
+
+            pipeline = [
+                {"$match": match_stage},
+                {"$sample": {"size": limit}}
+            ]
+            cursor = self.collection.aggregate(pipeline)
+            return [doc async for doc in cursor]
+        except Exception as e:
+            raise DatabaseError(f"Database random sample failed: {e}") from e
+
