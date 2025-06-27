@@ -1,12 +1,12 @@
 import logging
 import traceback
+
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.core.exceptions.types import AppError
-from app.core.response.response import error_response
 from app.core.config.settings import settings  # 환경 구분용
+from app.core.exceptions.types import AppError
 
 # 로거 설정
 logger = logging.getLogger("uvicorn.error")
