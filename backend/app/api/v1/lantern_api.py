@@ -88,14 +88,18 @@ async def get_lanterns(
 )
 async def get_lantern_detail(
         lantern_id: str,
-        current_lantern_id: str = Query(...),
+        current_lantern_id: Optional[str] = Query(
+            None,
+            description="현재 보고 있는 랜턴 ID (선택값)",
+            regex=r"^[가-힣a-zA-Z0-9]+-[0-9]+$"
+        ),
         db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
     lantern = await lantern_service.get_lantern_detail(lantern_id, current_lantern_id=current_lantern_id)
 
     if not lantern:
-        return error_response(message="Lantern not found")
+        return error_response(message="Lantern not found", error_code="LANTERN_NOT_FOUND")
 
     return success_response(
         data=lantern.model_dump(),
