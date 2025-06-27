@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
 
 from app.core.db.database import get_mongo_client
@@ -45,7 +47,6 @@ async def create_lanterns(
     lantern_id = await lantern_service.create_lanterns(name, image)
     return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")
 
-
 @router.get(
     "/lanterns",
     responses={
@@ -57,8 +58,11 @@ async def create_lanterns(
     }
 )
 async def get_lanterns(
-    current_lantern_id: str = Query(...),
-    db=Depends(get_mongo_client)
+        current_lantern_id: Optional[str] = Query(
+            None,
+            description="현재 조회 중인 랜턴 ID",
+            regex=r"^[가-힣a-zA-Z0-9]+-[0-9]+$"
+        ), db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
     lanterns = await lantern_service.get_recent_lanterns(current_lantern_id=current_lantern_id)

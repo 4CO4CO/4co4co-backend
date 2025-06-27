@@ -10,6 +10,9 @@
 **/.env.*
 **/k8s
 
+# logging files
+**/logs/
+
 # IDE configs (루트 및 하위 폴더 전부)
 .idea/
 .vscode/

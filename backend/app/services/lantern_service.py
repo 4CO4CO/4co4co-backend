@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from uuid import uuid4
 
 from app.core.exceptions.types import FileSaveError, ValidationError, NotFoundError
@@ -41,28 +42,33 @@ class LanternService:
         generate_panorama_task.delay(prompt=name, lantern_id=lantern_id, image_path=file_path)
 
         return lantern_id
+    def to_lantern_model(self, doc: dict, current_lantern_id: Optional[str]) -> LanternListResponseModel:
+        return LanternListResponseModel(
+            lantern_id=doc["lantern_id"],
+            owner_name=doc["user_name"],
+            is_current_lantern=(doc["lantern_id"] == current_lantern_id)
+        )
 
-    async def get_recent_lanterns(self, current_lantern_id: str, limit: int = 20):
+    async def get_recent_lanterns(self, current_lantern_id: Optional[str] = None, limit: int = 20):
+        current_doc = None
+
         if current_lantern_id:
-            count = await self.lantern_repo.count_documents({"lantern_id": current_lantern_id})
-            if count == 0:
-                raise NotFoundError(f"Current Lantern ID {current_lantern_id} not found.")
+            current_doc = await self.lantern_repo.find_by_lantern_id(current_lantern_id)
+            if not current_doc:
+                raise NotFoundError(
+                    message=f"Lantern ID {current_lantern_id} not found.",
+                    error_code="LANTERN_NOT_FOUND"
+                )
+            limit -= 1
 
-        recent_lanterns = await self.lantern_repo.find_recent_lanterns(limit)
-        lanterns = []
+        other_docs = await self.lantern_repo.find_random_lanterns(
+            exclude_lantern_id=current_lantern_id if current_doc else None,
+            limit=limit
+        )
 
-        for lantern_doc in recent_lanterns:
-            music = await self.music_repo.find_music_by_lantern_id(lantern_doc["lantern_id"])
+        docs = [current_doc] + other_docs if current_doc else other_docs
 
-            lantern = LanternListResponseModel(
-                lantern_id=lantern_doc["lantern_id"],
-                owner_name=lantern_doc["user_name"],
-                emotion=music.get("prompt", "unknown") if music else "unknown",
-                is_current_lantern=(lantern_doc["lantern_id"] == current_lantern_id)
-            )
-            lanterns.append(lantern)
-
-        return lanterns
+        return [self.to_lantern_model(doc, current_lantern_id) for doc in docs]
 
     async def get_lantern_detail(self, lantern_id: str, current_lantern_id: str):
         if current_lantern_id:
