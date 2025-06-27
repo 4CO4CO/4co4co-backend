@@ -1,30 +1,20 @@
-from typing import List, Optional
 from datetime import datetime
+from typing import Optional
+
 from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict, field_serializer
 
 
-class ImageInfo(BaseModel):
-    s3_path: str
-    original_filename: Optional[str]
-    file_extension: Optional[str]
-    file_size: Optional[int]
-
-
-class MusicInfo(BaseModel):
-    prompt: str
-    s3_path: str
-    created_at: datetime
-
-
-class LanternDBModel(BaseModel):
+class LanternsDBModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: Optional[ObjectId] = Field(default=None, alias="_id")
     lantern_id: str
     user_name: str
-    images: List[ImageInfo] = []
-    musics: List[MusicInfo] = []
+    image_path: str
+    original_filename: Optional[str] = None
+    file_extension: Optional[str] = None
+    file_size: Optional[int] = None
     is_public: bool
     created_at: datetime
 

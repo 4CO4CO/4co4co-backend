@@ -1,9 +1,9 @@
 from pydantic import BaseModel
+from typing import List
 
 
 class LanternDetailResponseModel(BaseModel):
     lantern_id: str
     owner_name: str
-    panorama: str
-    background_sound: str
-    is_current_lantern: bool
+    images: List[str]
+    background_sounds: List[str]

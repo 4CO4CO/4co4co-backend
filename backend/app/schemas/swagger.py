@@ -1,4 +1,4 @@
-from app.schemas.schemas import ErrorResponseModel
+from app.schemas.response.schemas import ErrorResponseModel
 
 error_400 = {
     "description": "INVALID_INPUT_FORMAT",
@@ -13,6 +13,21 @@ error_400 = {
         }
     }
 }
+
+error_403 = {
+    "description": "LANTERN_NOT_PUBLIC",
+    "model": ErrorResponseModel,
+    "content": {
+        "application/json": {
+            "example": {
+                "status": "error",
+                "error_code": "LANTERN_NOT_PUBLIC",
+                "message": "비공개 랜턴입니다."
+            }
+        }
+    }
+}
+
 
 error_404 = {
     "description": "LANTERN_NOT_FOUND",

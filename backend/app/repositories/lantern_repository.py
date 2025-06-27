@@ -1,6 +1,6 @@
 from typing import Optional
 
-from app.core.exceptions.types import DatabaseError, NotFoundError
+from app.core.exceptions.types import DatabaseError
 
 
 class LanternRepository:

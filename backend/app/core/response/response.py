@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.schemas.schemas import ResponseModel, ErrorResponseModel
+from app.schemas.response.schemas import ResponseModel, ErrorResponseModel
 
 
 def success_response(data: Any, message: str = "Success"):

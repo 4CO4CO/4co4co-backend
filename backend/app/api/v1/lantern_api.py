@@ -1,13 +1,14 @@
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, Path
 
 from app.core.db.database import get_mongo_client
 from app.core.exceptions.types import ValidationError
-from app.core.response.response import success_response, error_response
+from app.core.response.response import success_response
+from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
-from app.schemas.schemas import ResponseModel
-from app.schemas.swagger import error_400, error_404, error_500
+from app.schemas.response.schemas import ResponseModel
+from app.schemas.swagger import error_400, error_403, error_404, error_500
 from app.services.lantern_service import LanternService
 
 router = APIRouter()
@@ -61,11 +62,11 @@ async def create_lanterns(
         500: error_500
     }
 )
-async def get_lanterns(
+async def get_lantern_list(
         current_lantern_id: Optional[str] = Query(
             None,
-            description="현재 관람 중인 사용자의 랜턴 ID",
-            regex=r"^[가-힣a-zA-Z0-9]+-[0-9]+$"
+            description="현재 체험 중인 사용자 랜턴 ID",
+            regex = r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
         ), db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
@@ -78,25 +79,25 @@ async def get_lanterns(
 
 @router.get(
     "/lanterns/{lantern_id}",
+    response_model=ResponseModel[LanternDetailResponseModel],
     responses={
-        200: {"description": "Successfully retrieved lantern detail"},
-        400: {"description": "Bad Request - Invalid lantern_id or current_lantern_id format"},
-        404: {"description": "Not Found - Lantern not found"},
-        422: {"description": "Unprocessable Entity - Missing or invalid parameters"},
-        500: {"description": "Internal Server Error"}
+        200: {"description": "Lantern Detail"},
+        400: error_400,
+        403: error_403,
+        404: error_404,
+        500: error_500
     }
 )
 async def get_lantern_detail(
-        lantern_id: str,
-        current_lantern_id: str = Query(...),
+        lantern_id: str = Path(
+            ...,
+            description="조회할 랜턴의 ID",
+            regex = r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
+        ),
         db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
-    lantern = await lantern_service.get_lantern_detail(lantern_id, current_lantern_id=current_lantern_id)
-
-    if not lantern:
-        return error_response(message="Lantern not found")
-
+    lantern = await lantern_service.get_lantern_detail(lantern_id)
     return success_response(
         data=lantern.model_dump(),
         message="Lantern detail"
