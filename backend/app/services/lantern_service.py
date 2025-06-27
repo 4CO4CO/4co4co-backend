@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from app.core.exceptions.types import FileSaveError, ValidationError, NotFoundError
-from app.core.s3 import upload_file_to_s3
+from app.core.config.s3 import upload_file_to_s3
 from app.core.tasks.panorama_tasks import generate_panorama_task
 from app.repositories.lantern_repository import LanternRepository
 from app.repositories.music_repository import MusicRepository

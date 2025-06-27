@@ -16,5 +16,3 @@ celery_app.conf.update(
     enable_utc=True,
 )
 
-import app.core.tasks.panorama_tasks
-
