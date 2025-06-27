@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, Path
 
 from app.core.db.database import get_mongo_client
 from app.core.exceptions.types import ValidationError
@@ -65,8 +65,8 @@ async def create_lanterns(
 async def get_lantern_list(
         current_lantern_id: Optional[str] = Query(
             None,
-            description="현재 관람 중인 사용자의 랜턴 ID",
-            regex=r"^[가-힣a-zA-Z0-9]+-[0-9]+$"
+            description="현재 체험 중인 사용자 랜턴 ID",
+            regex = r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
         ), db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
@@ -88,7 +88,11 @@ async def get_lantern_list(
     }
 )
 async def get_lantern_detail(
-        lantern_id: str,
+        lantern_id: str = Path(
+            ...,
+            description="조회할 랜턴의 ID",
+            regex = r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
+        ),
         db=Depends(get_mongo_client)
 ):
     lantern_service = LanternService(db)
