@@ -1,41 +1,51 @@
 class AppError(Exception):
     """Base class for all custom application exceptions."""
     status_code = 500
+    error_code = "APP_ERROR"
 
-    def __init__(self, message="Application error"):
+    def __init__(self, message="Application error", error_code=None):
         self.message = message
+        self.error_code = error_code or self.error_code
         super().__init__(message)
 
 
 class DatabaseError(AppError):
     """Raised when a database operation fails."""
-    def __init__(self, message="Database operation failed"):
-        super().__init__(message)
+    error_code = "DATABASE_ERROR"
+
+    def __init__(self, message="Database operation failed", error_code=None):
+        super().__init__(message=message, error_code=error_code or self.error_code)
 
 
 class FileSaveError(AppError):
     """Raised when file saving fails."""
-    def __init__(self, message="File saving failed"):
-        super().__init__(message)
+    error_code = "FILE_SAVE_ERROR"
+
+    def __init__(self, message="File saving failed", error_code=None):
+        super().__init__(message=message, error_code=error_code or self.error_code)
 
 
 class ValidationError(AppError):
     """Raised when input validation fails."""
     status_code = 400
+    error_code = "VALIDATION_ERROR"
 
-    def __init__(self, message="Validation error"):
-        super().__init__(message)
+    def __init__(self, message="Validation error", error_code=None):
+        super().__init__(message=message, error_code=error_code or self.error_code)
 
 
 class NotFoundError(AppError):
     """Raised when a requested resource is not found."""
     status_code = 404
+    error_code = "NOT_FOUND"
 
-    def __init__(self, message="Resource not found"):
-        super().__init__(message)
+    def __init__(self, message="Resource not found", error_code=None):
+        super().__init__(message=message, error_code=error_code or self.error_code)
 
 
 class AIResponseProcessingError(AppError):
     """Raised when AI response processing failed."""
-    def __init__(self, message="AI response processing failed"):
-        super().__init__(message)
+    error_code = "AI_RESPONSE_PROCESSING_ERROR"
+
+    def __init__(self, message="AI response processing failed", error_code=None):
+        super().__init__(message=message, error_code=error_code or self.error_code)
