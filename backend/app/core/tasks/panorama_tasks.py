@@ -5,7 +5,7 @@ from datetime import datetime
 import redis
 import requests
 
-from app.core.celery_app import celery_app
+from app.core.tasks.celery_app import celery_app
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_sync_client
 from app.schemas.db.panorama import PanoramaDBModel

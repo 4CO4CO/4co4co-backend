@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     AI_SERVER_URL: str = Field(...)
 
     # AWS
+    AWS_ACCESS_KEY_ID: str = Field(...)
+    AWS_SECRET_ACCESS_KEY: str = Field(...)
     AWS_REGION: str = Field(...)
     AWS_S3_BUCKET_NAME: str = Field(...)
 
@@ -24,6 +26,7 @@ class Settings(BaseSettings):
     REDIS_PORT: int = Field(...)
 
     class Config:
+        env_file = ".env"
         case_sensitive = True
 
 settings = Settings()
