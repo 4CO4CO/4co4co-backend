@@ -12,7 +12,7 @@ class ImageInfo(BaseModel):
 
 
 class MusicInfo(BaseModel):
-    prompt: str
+    description: str
     s3_path: str
     created_at: datetime
 
@@ -25,6 +25,7 @@ class LanternDBModel(BaseModel):
     user_name: str
     images: List[ImageInfo] = []
     musics: List[MusicInfo] = []
+    music_tasks: List[str] = []
     is_public: bool
     created_at: datetime
 

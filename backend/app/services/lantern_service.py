@@ -10,9 +10,9 @@ from app.repositories.lantern_repository import LanternRepository
 from app.schemas.db.lantern import LanternDBModel, ImageInfo
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
+from app.core.tasks.music_tasks import process_lantern_music
 
 
-# DB document를 응답 모델로 변환
 def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
     return LanternResponseModel(
         lantern_id=doc["lantern_id"],
@@ -25,51 +25,71 @@ class LanternService:
     def __init__(self, db):
         self.lantern_repo = LanternRepository(db)
 
-    """
-    랜턴 생성
-    """
-    async def create_lanterns(self, name: str, description: str, images: List[UploadFile], is_public: bool = True):
-        # 랜턴 ID 생성 (이름 + 4자리 난수). 중복 방지를 위해 최대 5회 시도
+    async def create_lanterns(
+            self,
+            name: str,
+            description: str,
+            images: List[UploadFile],
+            is_public: bool = True
+    ) -> str:
+        # 1) 랜턴 ID 생성
         MAX_RETRY = 5
         for _ in range(MAX_RETRY):
-            random_code = str(random.randint(1000, 9999))
-            lantern_id = f"{name}-{random_code}"
-            exists = await self.lantern_repo.exists_by_lantern_id(lantern_id)
-            if not exists:
+            code = str(random.randint(1000, 9999))
+            lantern_id = f"{name}-{code}"
+            if not await self.lantern_repo.exists_by_lantern_id(lantern_id):
                 break
         else:
             raise ValidationError("Duplicate lantern ID")
 
-        # 이미지 S3 업로드 및 정보 수집
+        # 2) 이미지 S3 업로드
         uploaded_images: List[ImageInfo] = []
-        for image in images:
-            file_path, original_filename, file_extension, file_size = await self._upload_image_to_s3(image)
+        for img in images:
+            path, orig, ext, size = await self._upload_image_to_s3(img)
             uploaded_images.append(
                 ImageInfo(
-                    s3_path=file_path,
-                    original_filename=original_filename,
-                    file_extension=file_extension,
-                    file_size=file_size
+                    s3_path=path,
+                    original_filename=orig,
+                    file_extension=ext,
+                    file_size=size
                 )
             )
 
-        # DB에 저장할 문서 구성
+        # 3) 기본 랜턴 문서 삽입 (musics, music_tasks 빈 리스트)
         lantern_doc = LanternDBModel(
             lantern_id=lantern_id,
             user_name=name,
             images=uploaded_images,
             musics=[],
+            music_tasks=[],
             is_public=is_public,
             created_at=datetime.utcnow()
         )
-
-        # MongoDB에 문서 삽입
         await self.lantern_repo.insert_lantern(lantern_doc.model_dump(exclude={'id'}))
+
+        # 4) Celery 태스크 등록 및 task_id 수집
+        task_ids: List[str] = []
+        for info in uploaded_images:
+            task = process_lantern_music.delay(
+                lantern_id,
+                info.s3_path,  # 단일 이미지 키
+                description
+            )
+            task_ids.append(task.id)
+
+        # 5) 태스크 ID를 랜턴 문서에 업데이트
+        await self.lantern_repo.collection.update_one(
+            {"lantern_id": lantern_id},
+            {"$set": {"music_tasks": task_ids}}
+        )
+
+        # 6) 클라이언트에는 lantern_id만 반환
         return lantern_id
 
     """
     최근 랜턴 조회 (최신 랜턴 + 랜덤 추천 조합)
     """
+
     async def get_recent_lanterns(self, current_lantern_id: Optional[str] = None, limit: int = 20):
         current_doc = None
 
@@ -97,6 +117,7 @@ class LanternService:
     """
     특정 랜턴 상세 조회
     """
+
     async def get_lantern_detail(self, lantern_id: str):
         # 랜턴 ID로 문서 조회
         lantern = await self.lantern_repo.find_by_lantern_id(lantern_id)
@@ -134,17 +155,18 @@ class LanternService:
     """
     S3에 이미지 업로드 후 파일 정보 반환
     """
+
     @staticmethod
     async def _upload_image_to_s3(image):
         original_filename = image.filename
         file_extension = original_filename.split('.')[-1]
 
         try:
-            file_path, file_size = await upload_file_to_s3(image, folder="lanterns")
-            if file_path is None:
+            s3_key, file_size = await upload_file_to_s3(image, folder="lanterns")
+            if s3_key is None:
                 raise FileSaveError("S3 upload failed")
 
         except Exception as e:
             raise FileSaveError(f"File upload failed: {e}") from e
 
-        return file_path, original_filename, file_extension, file_size
+        return s3_key, original_filename, file_extension, file_size

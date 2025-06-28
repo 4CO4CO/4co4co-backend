@@ -62,3 +62,10 @@ def get_mongo_sync_client():
         serverSelectionTimeoutMS=settings.MONGO_SERVER_SELECTION_TIMEOUT_MS
     )
     return client[settings.MONGO_DB]
+
+def get_db():
+    """
+    Celery 워커 등 동기 컨텍스트에서 사용할 DB 객체 반환
+    """
+    return get_mongo_sync_client()
+

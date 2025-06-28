@@ -12,6 +12,7 @@ s3_client = boto3.client(
     region_name=settings.AWS_REGION
 )
 
+
 async def upload_file_to_s3(file: UploadFile, folder: str = "uploads"):
     try:
         file_content = await file.read()
@@ -26,8 +27,7 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads"):
             s3_file_key
         )
 
-        file_path = f"https://{settings.AWS_S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_file_key}"
-        return file_path, file_size
+        return s3_file_key, file_size
 
     except ClientError as e:
         print(e)

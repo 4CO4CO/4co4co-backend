@@ -1,11 +1,11 @@
 from celery import Celery
-
 from app.core.config.settings import settings
 
 celery_app = Celery(
     "backend",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
+    backend=settings.REDIS_URL,
+    include=["app.core.tasks.music_tasks"],
 )
 
 celery_app.conf.update(
@@ -15,4 +15,3 @@ celery_app.conf.update(
     timezone='Asia/Seoul',
     enable_utc=True,
 )
-
