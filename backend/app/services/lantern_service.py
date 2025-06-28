@@ -7,7 +7,7 @@ from fastapi import UploadFile
 from app.core.config.s3 import upload_file_to_s3
 from app.core.exceptions.types import FileSaveError, NotFoundError, ForbiddenError, ValidationError
 from app.repositories.lantern_repository import LanternRepository
-from app.schemas.db.lantern import LanternDBModel, ImageInfo
+from app.schemas.db.lantern import LanternDBModel, ImageInfo, MusicStatusInfo
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
 from app.core.tasks.music_tasks import process_lantern_music
@@ -25,6 +25,9 @@ class LanternService:
     def __init__(self, db):
         self.lantern_repo = LanternRepository(db)
 
+    """
+    랜턴 생성
+    """
     async def create_lanterns(
             self,
             name: str,
@@ -55,35 +58,41 @@ class LanternService:
                 )
             )
 
-        # 3) 기본 랜턴 문서 삽입 (musics, music_tasks 빈 리스트)
+        # 3) Celery 태스크 등록 및 상태 정보 구성
+        task_ids: List[str] = []
+        music_statuses: List[MusicStatusInfo] = []
+
+        for info in uploaded_images:
+            task = process_lantern_music.delay(
+                lantern_id,
+                info.s3_path,
+                description
+            )
+            task_ids.append(task.id)
+
+            music_statuses.append(
+                MusicStatusInfo(
+                    image_s3=info.s3_path,
+                    task_id=task.id,
+                    status="pending",
+                    s3_key=None
+                )
+            )
+
+        # 4) 기본 랜턴 문서 삽입
         lantern_doc = LanternDBModel(
             lantern_id=lantern_id,
             user_name=name,
             images=uploaded_images,
             musics=[],
-            music_tasks=[],
+            music_tasks=task_ids,
+            music_statuses=music_statuses,
             is_public=is_public,
             created_at=datetime.utcnow()
         )
         await self.lantern_repo.insert_lantern(lantern_doc.model_dump(exclude={'id'}))
 
-        # 4) Celery 태스크 등록 및 task_id 수집
-        task_ids: List[str] = []
-        for info in uploaded_images:
-            task = process_lantern_music.delay(
-                lantern_id,
-                info.s3_path,  # 단일 이미지 키
-                description
-            )
-            task_ids.append(task.id)
-
-        # 5) 태스크 ID를 랜턴 문서에 업데이트
-        await self.lantern_repo.collection.update_one(
-            {"lantern_id": lantern_id},
-            {"$set": {"music_tasks": task_ids}}
-        )
-
-        # 6) 클라이언트에는 lantern_id만 반환
+        # 5) 클라이언트에는 lantern_id만 반환
         return lantern_id
 
     """

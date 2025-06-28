@@ -22,7 +22,7 @@ def validate_description(description: str):
 
 
 def validate_images(images: List[UploadFile]):
-    if len(images) != 3:
+    if len(images) !=3:
         raise ValidationError("이미지는 정확히 3장을 업로드해야 합니다.", error_code="INVALID_IMAGE_COUNT")
 
     for image in images:
