@@ -1,4 +1,3 @@
-import re
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, Path
