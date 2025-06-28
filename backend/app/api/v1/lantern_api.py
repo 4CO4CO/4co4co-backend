@@ -3,13 +3,15 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, Path
 
 from app.core.db.database import get_mongo_client
+from app.core.exceptions.types import NotFoundError
 from app.core.response.response import success_response
 from app.core.validation.lantern_validation import validate_name, validate_description, validate_images
+from app.schemas.db.lantern import MusicStatusInfo
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
 from app.schemas.response.schemas import ResponseModel
 from app.schemas.swagger import error_400, error_403, error_404, error_500, error_400_lantern_examples, \
-    success_200_create_lantern
+    success_200_create_lantern, success_200_music_status
 from app.services.lantern_service import LanternService
 
 router = APIRouter()
@@ -96,3 +98,31 @@ async def get_lantern_detail(
         data=lantern.model_dump(),
         message="Lantern detail"
     )
+
+
+@router.get(
+    "/lanterns/{lantern_id}/music-status",
+    response_model=ResponseModel[List[MusicStatusInfo]],
+    responses={
+        200: success_200_music_status,
+        400: error_400,
+        404: error_404,
+        500: error_500
+    }
+)
+async def get_music_generation_status(
+        lantern_id: str = Path(
+            ...,
+            description="조회할 랜턴의 ID",
+            regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
+        ),
+        db=Depends(get_mongo_client)
+):
+    lantern_service = LanternService(db)
+    doc = await lantern_service.lantern_repo.find_by_lantern_id(lantern_id)
+
+    if not doc:
+        raise NotFoundError(f"Lantern ID {lantern_id} not found")
+
+    statuses = doc.get("music_statuses", [])
+    return success_response(data=statuses, message="Music generation status")
