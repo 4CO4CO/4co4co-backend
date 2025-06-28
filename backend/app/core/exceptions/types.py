@@ -45,12 +45,3 @@ class ForbiddenError(AppError):
 
     def __init__(self, message="Access denied", error_code=None):
         super().__init__(message=message, error_code=error_code)
-
-
-## 삭제 예정
-class AIResponseProcessingError(AppError):
-    """Raised when AI response processing failed."""
-    error_code = "AI_RESPONSE_PROCESSING_ERROR"
-
-    def __init__(self, message="AI response processing failed", error_code=None):
-        super().__init__(message=message, error_code=error_code or self.error_code)
