@@ -14,11 +14,6 @@ from app.services.lantern_service import LanternService
 
 router = APIRouter()
 
-VALID_NAME_REGEX = re.compile(r"^[가-힣a-zA-Z0-9 ]+$")
-
-ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
-MAX_FILE_SIZE_MB = 5
-
 
 @router.post(
     "/lanterns",
