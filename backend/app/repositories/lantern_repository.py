@@ -34,6 +34,10 @@ class LanternRepository:
         except Exception as e:
             raise DatabaseError(f"Database count failed: {e}") from e
 
+    async def exists_by_lantern_id(self, lantern_id: str) -> bool:
+        count = await self.collection.count_documents({"lantern_id": lantern_id})
+        return count > 0
+
     async def find_random_lanterns(self, limit: int = 20, exclude_lantern_id: Optional[str] = None):
         try:
             match_stage = {"is_public": True}

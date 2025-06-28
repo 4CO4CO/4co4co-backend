@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global mongo_client
     try:
-        # MongoDB 비동기 클라이언트 생성 (풀 사이즈 및 타임아웃 조정)
         mongo_client = AsyncIOMotorClient(
             settings.MONGO_URI,
             maxPoolSize=settings.MONGO_MAX_POOL_SIZE,
@@ -28,7 +28,15 @@ async def lifespan(app: FastAPI):
         await app.database.command("ping")
         logger.info("MongoDB ping 성공, 연결 정상")
 
-        yield  # FastAPI 앱 실행됨
+        # 유니크 인덱스 생성
+        await app.database["lanterns"].create_index(
+            [("lantern_id", 1)],
+            unique=True,
+            name="unique_lantern_id"
+        )
+        logger.info("lantern_id에 대한 unique index 보장 완료")
+
+        yield
 
     except Exception as e:
         logger.error(f"MongoDB 연결 실패: {e}")

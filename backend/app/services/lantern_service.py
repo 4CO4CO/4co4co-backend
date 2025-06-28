@@ -1,58 +1,79 @@
+import random
 from datetime import datetime
-from typing import Optional
-from uuid import uuid4
+from typing import Optional, List
 
-from app.core.exceptions.types import FileSaveError, ValidationError, NotFoundError, ForbiddenError
+from fastapi import UploadFile
+
 from app.core.config.s3 import upload_file_to_s3
-from app.core.tasks.panorama_tasks import generate_panorama_task
+from app.core.exceptions.types import FileSaveError, NotFoundError, ForbiddenError, ValidationError
 from app.repositories.lantern_repository import LanternRepository
-from app.repositories.music_repository import MusicRepository
-from app.repositories.panorama_repository import PanoramaRepository
-from app.schemas.db.lanterns import LanternsDBModel
+from app.schemas.db.lantern import LanternDBModel, ImageInfo
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
+
+
+# DB document를 응답 모델로 변환
+def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
+    return LanternResponseModel(
+        lantern_id=doc["lantern_id"],
+        owner_name=doc["user_name"],
+        is_current_lantern=(doc["lantern_id"] == current_lantern_id)
+    )
 
 
 class LanternService:
     def __init__(self, db):
         self.lantern_repo = LanternRepository(db)
-        self.music_repo = MusicRepository(db)
-        self.panorama_repo = PanoramaRepository(db)
 
-    async def create_lanterns(self, name, image):
-        if not name.strip():
-            raise ValidationError("Name is required")
+    """
+    랜턴 생성
+    """
+    async def create_lanterns(self, name: str, description: str, images: List[UploadFile], is_public: bool = True):
+        # 랜턴 ID 생성 (이름 + 4자리 난수). 중복 방지를 위해 최대 5회 시도
+        MAX_RETRY = 5
+        for _ in range(MAX_RETRY):
+            random_code = str(random.randint(1000, 9999))
+            lantern_id = f"{name}-{random_code}"
+            exists = await self.lantern_repo.exists_by_lantern_id(lantern_id)
+            if not exists:
+                break
+        else:
+            raise ValidationError("Duplicate lantern ID")
 
-        file_path, original_filename, file_extension, file_size = await self._upload_image_to_s3(image)
-        lantern_id = str(uuid4())
+        # 이미지 S3 업로드 및 정보 수집
+        uploaded_images: List[ImageInfo] = []
+        for image in images:
+            file_path, original_filename, file_extension, file_size = await self._upload_image_to_s3(image)
+            uploaded_images.append(
+                ImageInfo(
+                    s3_path=file_path,
+                    original_filename=original_filename,
+                    file_extension=file_extension,
+                    file_size=file_size
+                )
+            )
 
-        user_model = LanternsDBModel(
+        # DB에 저장할 문서 구성
+        lantern_doc = LanternDBModel(
             lantern_id=lantern_id,
             user_name=name,
-            image_path=file_path,
-            original_filename=original_filename,
-            file_extension=file_extension,
-            file_size=file_size,
+            images=uploaded_images,
+            musics=[],
+            is_public=is_public,
             created_at=datetime.utcnow()
         )
 
-        await self.lantern_repo.insert_lantern(user_model.model_dump(exclude={'id'}))
-
-        # Celery 비동기 작업 실행 추가
-        generate_panorama_task.delay(prompt=name, lantern_id=lantern_id, image_path=file_path)
-
+        # MongoDB에 문서 삽입
+        await self.lantern_repo.insert_lantern(lantern_doc.model_dump(exclude={'id'}))
         return lantern_id
 
-    def to_lantern_model(self, doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
-        return LanternResponseModel(
-            lantern_id=doc["lantern_id"],
-            owner_name=doc["user_name"],
-            is_current_lantern=(doc["lantern_id"] == current_lantern_id)
-        )
-
+    """
+    최근 랜턴 조회 (최신 랜턴 + 랜덤 추천 조합)
+    """
     async def get_recent_lanterns(self, current_lantern_id: Optional[str] = None, limit: int = 20):
         current_doc = None
 
+        # 현재 선택된 랜턴 ID가 존재하면 먼저 조회
         if current_lantern_id:
             current_doc = await self.lantern_repo.find_by_lantern_id(current_lantern_id)
             if not current_doc:
@@ -60,8 +81,9 @@ class LanternService:
                     message=f"Lantern ID {current_lantern_id} not found.",
                     error_code="LANTERN_NOT_FOUND"
                 )
-            limit -= 1
+            limit -= 1  # 나머지 추천 수 조정
 
+        # 나머지 랜덤 랜턴 목록 조회
         other_docs = await self.lantern_repo.find_random_lanterns(
             exclude_lantern_id=current_lantern_id if current_doc else None,
             limit=limit
@@ -69,9 +91,14 @@ class LanternService:
 
         docs = [current_doc] + other_docs if current_doc else other_docs
 
-        return [self.to_lantern_model(doc, current_lantern_id) for doc in docs]
+        # 응답 모델 리스트 반환
+        return [to_lantern_model(doc, current_lantern_id) for doc in docs]
 
+    """
+    특정 랜턴 상세 조회
+    """
     async def get_lantern_detail(self, lantern_id: str):
+        # 랜턴 ID로 문서 조회
         lantern = await self.lantern_repo.find_by_lantern_id(lantern_id)
         if not lantern:
             raise NotFoundError(
@@ -79,20 +106,24 @@ class LanternService:
                 error_code="LANTERN_NOT_FOUND"
             )
 
+        # 비공개 랜턴일 경우 접근 금지
         if not lantern.get("is_public", False):
             raise ForbiddenError(
                 message="This lantern is private.",
                 error_code="LANTERN_NOT_PUBLIC"
             )
 
+        # 이미지 경로 리스트 추출
         image_paths = [
             image["s3_path"] for image in lantern.get("images", []) if "s3_path" in image
         ]
 
+        # 배경음악 경로 리스트 추출
         background_sounds = [
             music["s3_path"] for music in lantern.get("musics", []) if "s3_path" in music
         ]
 
+        # 상세 응답 모델 반환
         return LanternDetailResponseModel(
             lantern_id=lantern["lantern_id"],
             owner_name=lantern["user_name"],
@@ -100,6 +131,9 @@ class LanternService:
             background_sounds=background_sounds
         )
 
+    """
+    S3에 이미지 업로드 후 파일 정보 반환
+    """
     @staticmethod
     async def _upload_image_to_s3(image):
         original_filename = image.filename
@@ -114,5 +148,3 @@ class LanternService:
             raise FileSaveError(f"File upload failed: {e}") from e
 
         return file_path, original_filename, file_extension, file_size
-
-
