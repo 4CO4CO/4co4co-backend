@@ -10,51 +10,38 @@ class AppError(Exception):
 
 
 class DatabaseError(AppError):
-    """Raised when a database operation fails."""
     error_code = "DATABASE_ERROR"
 
     def __init__(self, message="Database operation failed", error_code=None):
-        super().__init__(message=message, error_code=error_code or self.error_code)
+        super().__init__(message=message, error_code=error_code)
 
 
 class FileSaveError(AppError):
-    """Raised when file saving fails."""
     error_code = "FILE_SAVE_ERROR"
 
-    def __init__(self, message="File saving failed", error_code=None):
-        super().__init__(message=message, error_code=error_code or self.error_code)
+    def __init__(self, message="File upload failed", error_code=None):
+        super().__init__(message=message, error_code=error_code)
 
 
 class ValidationError(AppError):
-    """Raised when input validation fails."""
     status_code = 400
     error_code = "VALIDATION_ERROR"
 
-    def __init__(self, message="Validation error", error_code=None):
-        super().__init__(message=message, error_code=error_code or self.error_code)
+    def __init__(self, message="Invalid input", error_code=None):
+        super().__init__(message=message, error_code=error_code)
 
 
 class NotFoundError(AppError):
-    """Raised when a requested resource is not found."""
     status_code = 404
     error_code = "NOT_FOUND"
 
     def __init__(self, message="Resource not found", error_code=None):
-        super().__init__(message=message, error_code=error_code or self.error_code)
-
-
-class AIResponseProcessingError(AppError):
-    """Raised when AI response processing failed."""
-    error_code = "AI_RESPONSE_PROCESSING_ERROR"
-
-    def __init__(self, message="AI response processing failed", error_code=None):
-        super().__init__(message=message, error_code=error_code or self.error_code)
+        super().__init__(message=message, error_code=error_code)
 
 
 class ForbiddenError(AppError):
-    """Raised when access to a resource is forbidden (e.g. private lantern)."""
     status_code = 403
     error_code = "FORBIDDEN"
 
-    def __init__(self, message="접근이 금지된 리소스입니다.", error_code=None):
-        super().__init__(message=message, error_code=error_code or self.error_code)
+    def __init__(self, message="Access denied", error_code=None):
+        super().__init__(message=message, error_code=error_code)
