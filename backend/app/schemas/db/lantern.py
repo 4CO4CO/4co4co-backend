@@ -4,6 +4,13 @@ from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict, field_serializer
 
 
+class MusicStatusInfo(BaseModel):
+    image_s3: str
+    task_id: str
+    status: str  # "pending", "success", "failed" 등
+    s3_key: Optional[str] = None
+
+
 class ImageInfo(BaseModel):
     s3_path: str
     original_filename: Optional[str]
@@ -26,6 +33,7 @@ class LanternDBModel(BaseModel):
     images: List[ImageInfo] = []
     musics: List[MusicInfo] = []
     music_tasks: List[str] = []
+    music_statuses: List[MusicStatusInfo] = []
     is_public: bool
     created_at: datetime
 

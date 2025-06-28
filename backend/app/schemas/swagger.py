@@ -1,3 +1,6 @@
+from typing import List
+
+from app.schemas.db.lantern import MusicStatusInfo
 from app.schemas.response.schemas import ErrorResponseModel, ResponseModel
 
 success_200_create_lantern = {
@@ -16,6 +19,38 @@ success_200_create_lantern = {
     }
 }
 
+success_200_music_status = {
+    "description": "음악 생성 상태 조회 성공",
+    "model": ResponseModel[List[MusicStatusInfo]],
+    "content": {
+        "application/json": {
+            "example": {
+                "status": "success",
+                "message": "Music generation status",
+                "data": [
+                    {
+                        "image_s3": "lanterns/image1.jpg",
+                        "task_id": "abc123",
+                        "status": "success",
+                        "s3_key": "lanterns/music1.wav"
+                    },
+                    {
+                        "image_s3": "lanterns/image2.jpg",
+                        "task_id": "def456",
+                        "status": "pending",
+                        "s3_key": None
+                    },
+                    {
+                        "image_s3": "lanterns/image3.jpg",
+                        "task_id": "ghi789",
+                        "status": "failed",
+                        "s3_key": None
+                    }
+                ]
+            }
+        }
+    }
+}
 
 error_400_lantern_examples = {
     "description": "랜턴 생성 관련 400 Bad Request",
