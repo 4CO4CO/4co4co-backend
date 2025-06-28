@@ -9,7 +9,8 @@ from app.core.validation.lantern_validation import validate_name, validate_descr
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
 from app.schemas.response.schemas import ResponseModel
-from app.schemas.swagger import error_400, error_403, error_404, error_500
+from app.schemas.swagger import error_400, error_403, error_404, error_500, error_400_lantern_examples, \
+    success_200_create_lantern
 from app.services.lantern_service import LanternService
 
 router = APIRouter()
@@ -17,11 +18,11 @@ router = APIRouter()
 
 @router.post(
     "/lanterns",
+    response_model=ResponseModel[dict],
     responses={
-        200: {"description": "Lantern successfully created"},
-        400: {"description": "Bad Request - Validation failed (invalid format, oversized file)"},
-        422: {"description": "Unprocessable Entity - Missing required fields or wrong types"},
-        500: {"description": "Internal Server Error"}
+        200: success_200_create_lantern,
+        400: error_400_lantern_examples,
+        500: error_500
     }
 )
 async def create_lanterns(
