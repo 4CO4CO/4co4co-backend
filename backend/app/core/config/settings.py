@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     REDIS_HOST: str = Field(...)
     REDIS_PORT: int = Field(...)
 
+    SSE_TIMEOUT: int = Field(180)
+
     class Config:
         env_file = ".env"
         case_sensitive = True
