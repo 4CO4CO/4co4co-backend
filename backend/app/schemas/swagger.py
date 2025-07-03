@@ -20,37 +20,31 @@ success_200_create_lantern = {
 }
 
 success_200_music_status = {
-    "description": "음악 생성 상태 조회 성공",
-    "model": ResponseModel[List[MusicStatusInfo]],
+    "description": "음악 생성 상태 실시간 스트리밍 (SSE)",
     "content": {
-        "application/json": {
-            "example": {
-                "status": "success",
-                "message": "Music generation status",
-                "data": [
-                    {
-                        "image_s3": "lanterns/image1.jpg",
-                        "task_id": "abc123",
-                        "status": "success",
-                        "s3_key": "lanterns/music1.wav"
-                    },
-                    {
-                        "image_s3": "lanterns/image2.jpg",
-                        "task_id": "def456",
-                        "status": "pending",
-                        "s3_key": None
-                    },
-                    {
-                        "image_s3": "lanterns/image3.jpg",
-                        "task_id": "ghi789",
-                        "status": "failed",
-                        "s3_key": None
-                    }
-                ]
+        "text/event-stream": {
+            "examples": {
+                "music_done_partial": {
+                    "summary": "일부 음악 생성 완료 이벤트",
+                    "value": (
+                        'event: music_done_partial\n'
+                        'data: {"image_s3": "lanterns/image1.jpg", "task_id": "abc123", "status": "success", "s3_key": "lanterns/music1.wav"}\n\n'
+                    )
+                },
+                "music_done_all": {
+                    "summary": "전체 음악 생성 완료 이벤트",
+                    "value": (
+                        'event: music_done_all\n'
+                        'data: [{"image_s3": "lanterns/image1.jpg", "task_id": "abc123", "status": "success", "s3_key": "lanterns/music1.wav"}, '
+                        '{"image_s3": "lanterns/image2.jpg", "task_id": "def456", "status": "success", "s3_key": "lanterns/music2.wav"}, '
+                        '{"image_s3": "lanterns/image3.jpg", "task_id": "ghi789", "status": "success", "s3_key": "lanterns/music3.wav"}]\n\n'
+                    )
+                }
             }
         }
     }
 }
+
 
 error_400_lantern_examples = {
     "description": "랜턴 생성 관련 400 Bad Request",

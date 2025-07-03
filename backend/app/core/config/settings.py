@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     REDIS_HOST: str = Field(...)
     REDIS_PORT: int = Field(...)
 
+    SSE_TIMEOUT: int = Field(180, gt=0, description="SSE 연결 유지 시간 (초)")
+    SSE_POLLING_INTERVAL: int = Field(3, gt=0, description="SSE 폴링 간격 (초)")
+
     class Config:
         env_file = ".env"
         case_sensitive = True
