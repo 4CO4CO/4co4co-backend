@@ -23,13 +23,22 @@ router = APIRouter()
 
 @router.get(
     "/lanterns/{lantern_id}/music-status",
-    responses={200: success_200_music_status},
+    responses={
+        200: success_200_music_status,
+        400: {"description": "Invalid lantern_id format"},
+        404: {"description": "Lantern not found"},
+        500: {"description": "Internal server error"},
+    },
 )
 async def music_status(
     request: Request,
-    lantern_id: str = Path(...),
+    lantern_id: str = Path(
+        ...,
+        description="조회할 랜턴의 ID",
+        regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
+    )
 ):
-    db = await get_mongo_client()
+    db = get_mongo_client(request)
     repo = LanternRepository(db)
     start_time = time.time()
     sent_task_ids = set()
@@ -94,12 +103,13 @@ async def music_status(
     }
 )
 async def create_lanterns(
+    request: Request,
     name: str = Form(..., min_length=1, max_length=50, description="사용자 이름 (1~50자)"),
     description: str = Form(..., description="이미지에 대한 설명"),
     images: List[UploadFile] = File(..., description="이미지 파일 (jpg, jpeg, png, webp, 각 5MB 이하, 총 3장)"),
     is_public: bool = Form(True, description="랜턴을 공개할지 여부"),
 ):
-    db = await get_mongo_client()
+    db = get_mongo_client(request)
     validate_name(name)
     validate_description(description)
     validate_images(images)
@@ -126,13 +136,14 @@ async def create_lanterns(
     }
 )
 async def get_lantern_list(
+    request: Request,
     current_lantern_id: Optional[str] = Query(
         None,
         description="현재 체험 중인 사용자 랜턴 ID",
         regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
     )
 ):
-    db = await get_mongo_client()
+    db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lanterns = await lantern_service.get_recent_lanterns(current_lantern_id=current_lantern_id)
     return success_response(
@@ -153,13 +164,14 @@ async def get_lantern_list(
     }
 )
 async def get_lantern_detail(
+    request: Request,
     lantern_id: str = Path(
         ...,
         description="조회할 랜턴의 ID",
         regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
     )
 ):
-    db = await get_mongo_client()
+    db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lantern = await lantern_service.get_lantern_detail(lantern_id)
     return success_response(
