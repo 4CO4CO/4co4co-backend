@@ -82,3 +82,4 @@ for i in range(DUMMY_DATA_COUNT):
     collection.insert_one(lantern)
 
 print(f"✅ {DUMMY_DATA_COUNT}개 더미 데이터 생성 완료!")
+client.close()
