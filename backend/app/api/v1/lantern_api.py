@@ -9,7 +9,7 @@ from sse_starlette.sse import EventSourceResponse
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_client
 from app.core.response.response import success_response
-from app.core.validation.lantern_validation import validate_name, validate_description, validate_images
+from app.core.validation.lantern_validation import validate_name, validate_images
 from app.repositories.lantern_repository import LanternRepository
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
@@ -105,19 +105,16 @@ async def music_status(
 async def create_lanterns(
     request: Request,
     name: str = Form(..., min_length=1, max_length=50, description="사용자 이름 (1~50자)"),
-    description: str = Form(..., description="이미지에 대한 설명"),
     images: List[UploadFile] = File(..., description="이미지 파일 (jpg, jpeg, png, webp, 각 5MB 이하, 총 3장)"),
     is_public: bool = Form(True, description="랜턴을 공개할지 여부"),
 ):
     db = get_mongo_client(request)
     validate_name(name)
-    validate_description(description)
     validate_images(images)
 
     lantern_service = LanternService(db)
     lantern_id = await lantern_service.create_lanterns(
         name=name,
-        description=description,
         images=images,
         is_public=is_public
     )

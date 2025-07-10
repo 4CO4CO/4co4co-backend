@@ -1,14 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api.v1.routers import api_router
+from app.core.config.openapi import custom_openapi
 from app.core.config.settings import settings
 from app.core.db.database import lifespan
 from app.core.exceptions.handlers import validation_exception_handler, app_error_handler, \
     generic_exception_handler
 from app.core.exceptions.types import AppError
-from app.core.config.openapi import custom_openapi
 
 app = FastAPI(lifespan=lifespan)
 

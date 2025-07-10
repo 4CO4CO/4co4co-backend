@@ -19,7 +19,6 @@ class ImageInfo(BaseModel):
 
 
 class MusicInfo(BaseModel):
-    description: str
     s3_path: str
     created_at: datetime
 

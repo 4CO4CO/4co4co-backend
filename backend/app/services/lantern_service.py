@@ -31,7 +31,6 @@ class LanternService:
     async def create_lanterns(
             self,
             name: str,
-            description: str,
             images: List[UploadFile],
             is_public: bool = True
     ) -> str:
@@ -66,7 +65,6 @@ class LanternService:
             task = process_lantern_music.delay(
                 lantern_id,
                 info.s3_path,
-                description
             )
             task_ids.append(task.id)
 

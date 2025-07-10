@@ -12,12 +12,10 @@ model = MusicGen.get_pretrained("facebook/musicgen-small")
 
 
 def generate_music(
-    description: str,
     image: str,
     duration: int = 10,
 ) -> dict:
     """
-    description: 텍스트 설명 (현재는 사용하지 않음)
     image: 단일 이미지 S3 경로
     duration: 생성할 음악 길이(초)
     """
