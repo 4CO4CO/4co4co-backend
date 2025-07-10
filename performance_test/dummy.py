@@ -1,23 +1,35 @@
+import os
 import random
 import string
 from datetime import datetime
 from pymongo import MongoClient
 from bson import ObjectId
+from dotenv import load_dotenv
+
+# .env 로드
+load_dotenv()
+
+# 환경 변수 (모두 반드시 존재해야 함)
+MONGO_URI = os.environ["MONGO_URI"]
+DB_NAME = os.environ["MONGO_DB_NAME"]
+COLLECTION_NAME = os.environ["MONGO_COLLECTION_NAME"]
+DUMMY_DATA_COUNT = int(os.environ["DUMMY_DATA_COUNT"])
+DEFAULT_USER_NAME = os.environ["DEFAULT_USER_NAME"]
 
 # Mongo 연결
-client = MongoClient("mongodb://localhost:27017")
-db = client["memory"]
-collection = db["lantern"]
+client = MongoClient(MONGO_URI)
+db = client[DB_NAME]
+collection = db[COLLECTION_NAME]
 
-# 컬렉션 초기화 (기존 문서 제거)
+# 기존 데이터 삭제
 collection.delete_many({})
 
 # 랜덤 ID 생성 함수
 def random_id():
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
-# 더미 문서 생성
-for i in range(300):
+# 더미 데이터 생성
+for i in range(DUMMY_DATA_COUNT):
     images = [
         {
             "s3_path": f"lanterns/pending_image_{i}_1.jpg",
@@ -57,8 +69,8 @@ for i in range(300):
 
     lantern = {
         "_id": ObjectId(),
-        "lantern_id": f"박유나-{i+1000}",  # → 숫자 4자리로 맞춤
-        "user_name": "박유나",
+        "lantern_id": f"{DEFAULT_USER_NAME}-{i+1000}",
+        "user_name": DEFAULT_USER_NAME,
         "images": images,
         "musics": [],
         "music_tasks": tasks,
@@ -69,4 +81,4 @@ for i in range(300):
 
     collection.insert_one(lantern)
 
-print("✅ 300개 더미 데이터 생성 완료!")
+print(f"✅ {DUMMY_DATA_COUNT}개 더미 데이터 생성 완료!")
