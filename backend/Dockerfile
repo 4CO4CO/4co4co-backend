@@ -13,5 +13,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 앱 코드 복사
 COPY . .
 
-# 기본 실행 명령 (uvicorn은 docker-compose에서 지정)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 최적 설정 반영된 Dockerfile CMD
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--loop", "asyncio", "--http", "h11", "--timeout-keep-alive", "30"]
