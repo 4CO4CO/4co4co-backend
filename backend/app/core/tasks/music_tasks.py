@@ -11,7 +11,6 @@ logger = get_logger(__name__)
 def process_lantern_music(
     lantern_id: str,
     image_key: str,
-    description: str
 ) -> str:
     """
     Celery 워커가 실행할 태스크.
@@ -27,7 +26,6 @@ def process_lantern_music(
         s3_key = service.generate_music(
             lantern_id=lantern_id,
             image=image_key,
-            description=description,
         )
 
         # 상태 업데이트: 'success'

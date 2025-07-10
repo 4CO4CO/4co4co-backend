@@ -9,7 +9,6 @@ from app.schemas.db.lantern import MusicInfo
 
 def call_ai_server(
     image: str,
-    description: str,
 ) -> str:
     """
     AI 서버에 단일 이미지 키와 설명을 보내고,
@@ -17,7 +16,7 @@ def call_ai_server(
     실패 시 AppError로 처리합니다.
     """
     url = f"{settings.AI_SERVER_URL}{settings.API_PREFIX}/generate-music"
-    payload = {"image": image, "description": description}
+    payload = {"image": image}
 
     try:
         resp = httpx.post(url, json=payload, timeout=1000.0)
@@ -45,7 +44,6 @@ class MusicService:
         self,
         lantern_id: str,
         image: str,
-        description: str,
     ) -> str:
         """
         lantern_id에 해당하는 Lantern가 존재하는지 확인한 뒤,
@@ -58,11 +56,10 @@ class MusicService:
             raise NotFoundError(f"Lantern ID {lantern_id} not found.")
 
         # 2) AI 서버 호출
-        s3_key = call_ai_server(image, description)
+        s3_key = call_ai_server(image)
 
         # 3) MusicInfo 모델로 문서 생성
         music_info = MusicInfo(
-            description=description,
             s3_path=s3_key,
             created_at=datetime.utcnow()
         ).model_dump(exclude={"id"})

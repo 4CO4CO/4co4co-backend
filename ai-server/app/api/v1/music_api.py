@@ -12,7 +12,6 @@ router = APIRouter()
 
 class GenerateMusicRequest(BaseModel):
     image: str
-    description: str
 
 
 class GenerateMusicResponse(BaseModel):
@@ -29,7 +28,6 @@ async def generate_music_api(body: GenerateMusicRequest):
     try:
         result = await run_in_threadpool(
             generate_music,
-            body.description,
             body.image,
             10
         )

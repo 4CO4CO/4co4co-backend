@@ -16,11 +16,6 @@ def validate_name(name: str):
         raise ValidationError("입력값을 확인해주세요.", error_code="LANTERN_VALIDATION_FAILED")
 
 
-def validate_description(description: str):
-    if not description.strip():
-        raise ValidationError("입력값을 확인해주세요.", error_code="LANTERN_VALIDATION_FAILED")
-
-
 def validate_images(images: List[UploadFile]):
     if len(images) !=3:
         raise ValidationError("이미지는 정확히 3장을 업로드해야 합니다.", error_code="INVALID_IMAGE_COUNT")
