@@ -1,15 +1,21 @@
 import os
 import sys
-
 from celery import Celery
+from dotenv import load_dotenv
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+load_dotenv()
+
 from task_stub import long_dummy_task
+
+broker_url = os.getenv("REDIS_BROKER_URL")
+backend_url = os.getenv("REDIS_BACKEND_URL")
 
 celery = Celery(
     "worker",
-    broker="redis://localhost:6379/0",   # Redis가 실행 중이어야 함
-    backend="redis://localhost:6379/0"
+    broker=broker_url,
+    backend=backend_url
 )
 
 @celery.task
