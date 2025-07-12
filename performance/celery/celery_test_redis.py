@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from celery_app import celery_task
+from celery_app_redis import celery_task
 
 app = FastAPI()
 task_counter = 0
