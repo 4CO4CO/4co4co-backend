@@ -21,7 +21,7 @@ services:
 
 #services:
 #  ai-server-cpu:
-#    container_name: ai-server-cpu
+#    container_name: ai-server
 #    build:
 #      context: .
 #      dockerfile: Dockerfile
