@@ -19,8 +19,9 @@ services:
               count: all
               capabilities: [gpu]
 
-# services:
-#  ai-server:
+#services:
+#  ai-server-cpu:
+#    container_name: ai-server-cpu
 #    build:
 #      context: .
 #      dockerfile: Dockerfile
@@ -29,3 +30,5 @@ services:
 #        BASE_IMAGE: python:3.10-slim
 #    env_file:
 #      - .env
+#    ports:
+#      - "8001:8001"
