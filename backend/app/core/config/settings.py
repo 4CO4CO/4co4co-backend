@@ -3,14 +3,16 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    APP_ENV: str = "production"
+    # 환경
+    APP_ENV: str = Field("production")
 
     # MongoDB
     MONGO_URI: str = Field(...)
     MONGO_DB: str = Field(...)
     MONGO_MAX_POOL_SIZE: int = Field(10)
-    MONGO_MIN_POOL_SIZE: int = Field(1)
-    MONGO_SERVER_SELECTION_TIMEOUT_MS: int = Field(30000)
+    MONGO_MIN_POOL_SIZE: int = Field(0)
+    MONGO_SERVER_SELECTION_TIMEOUT_MS: int = Field(5000)
+    MONGO_INITDB_DATABASE: str = Field(...)
 
     # API
     API_PREFIX: str = Field(...)
@@ -22,11 +24,12 @@ class Settings(BaseSettings):
     AWS_REGION: str = Field(...)
     AWS_S3_BUCKET_NAME: str = Field(...)
 
-    # Redis
-    REDIS_URL: str = Field(...)
-    REDIS_HOST: str = Field(...)
-    REDIS_PORT: int = Field(...)
+    # RABBITMQ
+    RABBITMQ_URL: str = Field(...)
+    RABBITMQ_USER: str = Field(...)
+    RABBITMQ_PASS: str = Field(...)
 
+    # SSE
     SSE_TIMEOUT: int = Field(180, gt=0, description="SSE 연결 유지 시간 (초)")
     SSE_POLLING_INTERVAL: int = Field(3, gt=0, description="SSE 폴링 간격 (초)")
 

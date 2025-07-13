@@ -1,13 +1,21 @@
+import time
+
 from app.core.db.database import get_db
-from app.core.tasks.celery_app import celery_app
-from app.services.music_service import MusicService
 from app.core.logging.logger import get_logger
+from app.core.tasks.celery_app import celery_app
 from app.repositories.lantern_repository import LanternRepository
+from app.services.music_service import MusicService
 
 logger = get_logger(__name__)
 
 
-@celery_app.task(name="process_lantern_music")
+@celery_app.task(
+    name="process_lantern_music",
+    acks_late=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3}
+)
 def process_lantern_music(
     lantern_id: str,
     image_key: str,

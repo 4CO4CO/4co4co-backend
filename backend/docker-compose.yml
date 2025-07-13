@@ -1,34 +1,51 @@
-version: "3.8"
-
 services:
-  redis:
-    image: redis:latest
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
     ports:
-      - "6379:6379"
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
 
   mongo:
     image: mongo:latest
+    container_name: mongo
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_DATABASE: mongo
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
 
   backend:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --loop asyncio --http h11 --timeout-keep-alive 30
+    container_name: backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT:-8000} --workers 1 --loop asyncio --http h11 --timeout-keep-alive 30
     volumes:
       - .:/app
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
-      - redis
+      - rabbitmq
       - mongo
+    env_file:
+      - .env   # 배포할 때 삭제 예정
 
   celery:
     build: .
-    command: celery -A app.core.celery_app.celery_app worker --loglevel=info --pool=threads
+    container_name: celery
+    command: >
+      celery -A app.core.tasks.celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=${CELERY_CONCURRENCY:-4}
+      --pool=prefork
+      --prefetch-multiplier=1
+      -Q celery
+      -n worker@%h
     volumes:
       - .:/app
     depends_on:
-      - redis
+      - rabbitmq
       - mongo
+    env_file:
+      - .env   # 배포할 때 삭제 예정

@@ -60,7 +60,6 @@ class LanternService:
         # 3) Celery 태스크 등록 및 상태 정보 구성
         task_ids: List[str] = []
         music_statuses: List[MusicStatusInfo] = []
-
         for info in uploaded_images:
             task = process_lantern_music.delay(
                 lantern_id,
