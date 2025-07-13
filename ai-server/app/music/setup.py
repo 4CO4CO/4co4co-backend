@@ -32,7 +32,7 @@ try:
 except FileNotFoundError:
     long_description = DESCRIPTION
 
-REQUIRED = [i.strip() for i in open(HERE / 'requirements.txt') if not i.startswith('#')]
+REQUIRED = [i.strip() for i in open(HERE / 'requirements-cpu.txt') if not i.startswith('#')]
 
 setup(
     name=NAME,

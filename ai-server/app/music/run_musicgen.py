@@ -1,15 +1,19 @@
 import os
 import tempfile
-
+import torch
 import torchaudio
+from threading import Lock
 
 from app.core.exceptions import GenerationError
 from app.core.s3 import upload_file_to_s3
 from audiocraft.models import MusicGen
 
 # 모델 로드 (한 번만)
-model = MusicGen.get_pretrained("facebook/musicgen-small")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = MusicGen.get_pretrained("facebook/musicgen-small", device=device)
 
+# 모델 generate 부분 thread-safe 처리
+model_lock = Lock()
 
 def generate_music(
     image: str,
@@ -26,7 +30,8 @@ def generate_music(
     hardcoded_prompt = "a soothing ambient track"
 
     try:
-        wav = model.generate([hardcoded_prompt], progress=False)
+        with model_lock:
+            wav = model.generate([hardcoded_prompt], progress=False)
     except Exception as e:
         raise GenerationError(f"Music generation failed: {e}") from e
 
