@@ -1,4 +1,6 @@
 # GPU
+version: "3.8"
+
 services:
   ai-server:
     container_name: ai-server
@@ -8,15 +10,14 @@ services:
       args:
         USE_GPU: true
         BASE_IMAGE: pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
     env_file:
       - .env
     ports:
       - "8001:8001"
-    runtime: nvidia
-    device_requests:
-      - driver: nvidia
-        count: all
-        capabilities: [gpu]
+
 
 # CPU
 #services:
