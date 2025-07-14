@@ -48,7 +48,7 @@ async def music_status(
 
     doc = await repo.find_by_lantern_id(lantern_id)
     if not doc:
-        raise NotFoundError("Lantern not found")
+        raise NotFoundError(f"Lantern ID '{lantern_id}' not found")
 
     if resume and last_event_id:
         valid_ids = {s["task_id"] for s in doc.get("music_statuses", [])}
