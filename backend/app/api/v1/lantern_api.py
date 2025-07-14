@@ -8,6 +8,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_client
+from app.core.exceptions.types import InvalidResumeEventError
 from app.core.response.response import success_response
 from app.core.validation.lantern_validation import validate_name, validate_images
 from app.repositories.lantern_repository import LanternRepository
@@ -46,7 +47,11 @@ async def music_status(
     sent_task_ids = set()
 
     if resume and last_event_id:
-        sent_task_ids.add(last_event_id)
+        valid_ids = {s["task_id"] for s in doc.get("music_statuses", [])}
+        if last_event_id in valid_ids:
+            sent_task_ids.add(last_event_id)
+        else:
+            raise InvalidResumeEventError(last_event_id)
 
     polling_interval = getattr(settings, 'SSE_POLLING_INTERVAL', 3)
 

@@ -18,7 +18,6 @@ def init_model():
     global model
     if model is None:
         model = MusicGen.get_pretrained("facebook/musicgen-small", device=device)
-        model.compression_model.to(device)
 
 def generate_music(image: str, duration: int = 10) -> dict:
     init_model()

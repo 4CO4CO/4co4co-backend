@@ -45,3 +45,11 @@ class ForbiddenError(AppError):
 
     def __init__(self, message="Access denied", error_code=None):
         super().__init__(message=message, error_code=error_code)
+
+class InvalidResumeEventError(AppError):
+    status_code = 400
+    error_code = "INVALID_RESUME_EVENT"
+
+    def __init__(self, last_event_id=None):
+        msg = f"Invalid resume event id: {last_event_id}" if last_event_id else "Invalid resume event id"
+        super().__init__(message=msg, error_code=self.error_code)
