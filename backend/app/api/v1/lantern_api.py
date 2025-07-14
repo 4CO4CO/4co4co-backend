@@ -3,7 +3,7 @@ import json
 import time
 from typing import Optional, List
 
-from fastapi import APIRouter, UploadFile, File, Form, Query, Path, Request
+from fastapi import APIRouter, UploadFile, File, Form, Query, Path, Request, Header
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.config.settings import settings
@@ -36,12 +36,18 @@ async def music_status(
         ...,
         description="조회할 랜턴의 ID",
         regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
-    )
+    ),
+    resume: bool = Query(False, description="이전 이벤트 ID를 기반으로 이어받을지 여부"),
+    last_event_id: Optional[str] = Header(None, convert_underscores=False)
 ):
     db = get_mongo_client(request)
     repo = LanternRepository(db)
     start_time = time.time()
     sent_task_ids = set()
+
+    if resume and last_event_id:
+        sent_task_ids.add(last_event_id)
+
     polling_interval = getattr(settings, 'SSE_POLLING_INTERVAL', 3)
 
     async def event_generator():
@@ -49,7 +55,6 @@ async def music_status(
             try:
                 if await request.is_disconnected():
                     break
-
                 if time.time() - start_time > settings.SSE_TIMEOUT:
                     break
 
@@ -62,23 +67,26 @@ async def music_status(
                     break
 
                 statuses = doc.get("music_statuses", [])
-
                 new_completed = [
                     s for s in statuses
                     if s["status"] == "success" and s["task_id"] not in sent_task_ids
                 ]
                 for s in new_completed:
                     yield {
+                        "id": s["task_id"],
                         "event": "music_done_partial",
                         "data": json.dumps(s)
                     }
                     sent_task_ids.add(s["task_id"])
 
                 if all(s["status"] == "success" for s in statuses) and len(statuses) > 0:
-                    yield {
-                        "event": "music_done_all",
-                        "data": json.dumps(statuses)
-                    }
+                    if "done-all" not in sent_task_ids:
+                        yield {
+                            "id": "done-all",
+                            "event": "music_done_all",
+                            "data": json.dumps(statuses)
+                        }
+                        sent_task_ids.add("done-all")
                     break
 
             except Exception as e:
