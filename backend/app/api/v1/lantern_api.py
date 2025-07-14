@@ -8,7 +8,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_client
-from app.core.exceptions.types import InvalidResumeEventError
+from app.core.exceptions.types import InvalidResumeEventError, NotFoundError
 from app.core.response.response import success_response
 from app.core.validation.lantern_validation import validate_name, validate_images
 from app.repositories.lantern_repository import LanternRepository
@@ -46,6 +46,10 @@ async def music_status(
     start_time = time.time()
     sent_task_ids = set()
 
+    doc = await repo.find_by_lantern_id(lantern_id)
+    if not doc:
+        raise NotFoundError("Lantern not found")
+
     if resume and last_event_id:
         valid_ids = {s["task_id"] for s in doc.get("music_statuses", [])}
         if last_event_id in valid_ids:
@@ -56,6 +60,7 @@ async def music_status(
     polling_interval = getattr(settings, 'SSE_POLLING_INTERVAL', 3)
 
     async def event_generator():
+        nonlocal doc
         while True:
             try:
                 if await request.is_disconnected():
