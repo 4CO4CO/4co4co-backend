@@ -21,9 +21,10 @@ def error_response(message: str = "An error occurred", error_code: str = "UNKNOW
     )
 
 
-def success_no_cache_response(data, message="Success"):
+def success_no_cache_response(data: Any, message: str = "Success"):
+    model = success_response(data=data, message=message)
     return JSONResponse(
-        content={"message": message, "data": data},
+        content=model.model_dump(),
         headers={
             "Cache-Control": "no-store, no-cache, must-revalidate",
             "Pragma": "no-cache",
