@@ -1,5 +1,7 @@
 from typing import Any
 
+from fastapi.responses import JSONResponse
+
 from app.schemas.response.schemas import ResponseModel, ErrorResponseModel
 
 
@@ -16,4 +18,15 @@ def error_response(message: str = "An error occurred", error_code: str = "UNKNOW
         status="error",
         error_code=error_code,
         message=message
+    )
+
+
+def success_no_cache_response(data, message="Success"):
+    return JSONResponse(
+        content={"message": message, "data": data},
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
     )
