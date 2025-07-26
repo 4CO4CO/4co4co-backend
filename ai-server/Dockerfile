@@ -1,5 +1,5 @@
 # 기본 이미지 설정
-ARG BASE_IMAGE=python:3.10-slim
+ARG BASE_IMAGE=python:3.11-slim
 FROM ${BASE_IMAGE}
 
 # 빌드 인자와 환경 변수 설정
