@@ -9,7 +9,7 @@ from sse_starlette.sse import EventSourceResponse
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_client
 from app.core.exceptions.types import InvalidResumeEventError, NotFoundError
-from app.core.response.response import success_response
+from app.core.response.response import success_response, success_no_cache_response
 from app.core.validation.lantern_validation import validate_name, validate_images
 from app.repositories.lantern_repository import LanternRepository
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
@@ -161,7 +161,7 @@ async def get_lantern_list(
     db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lanterns = await lantern_service.get_recent_lanterns(current_lantern_id=current_lantern_id)
-    return success_response(
+    return success_no_cache_response(
         data=[lantern.model_dump() for lantern in lanterns],
         message="Lantern list"
     )
