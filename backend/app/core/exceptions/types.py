@@ -46,10 +46,20 @@ class ForbiddenError(AppError):
     def __init__(self, message="Access denied", error_code=None):
         super().__init__(message=message, error_code=error_code)
 
+
 class InvalidResumeEventError(AppError):
     status_code = 400
     error_code = "INVALID_RESUME_EVENT"
 
     def __init__(self, last_event_id=None):
         msg = f"Invalid resume event id: {last_event_id}" if last_event_id else "Invalid resume event id"
+        super().__init__(message=msg, error_code=self.error_code)
+
+
+class InvalidDateFormatError(ValidationError):
+    error_code = "INVALID_DATE_FORMAT"
+
+    def __init__(self, date_value=None):
+        msg = (f"날짜 형식이 잘못되었습니다. (yyyy-mm-dd) → 입력값: {date_value}"
+               if date_value else "날짜 형식이 잘못되었습니다. (yyyy-mm-dd)")
         super().__init__(message=msg, error_code=self.error_code)

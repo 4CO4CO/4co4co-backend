@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, UploadFile, File, Form, Query, Path, Request, Header
@@ -8,7 +9,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_client
-from app.core.exceptions.types import InvalidResumeEventError, NotFoundError
+from app.core.exceptions.types import InvalidResumeEventError, NotFoundError, InvalidDateFormatError
 from app.core.response.response import success_response, success_no_cache_response
 from app.core.validation.lantern_validation import validate_name, validate_images
 from app.repositories.lantern_repository import LanternRepository
@@ -125,7 +126,13 @@ async def create_lanterns(
     name: str = Form(..., min_length=1, max_length=50, description="사용자 이름 (1~50자)"),
     images: List[UploadFile] = File(..., description="이미지 파일 (jpg, jpeg, png, webp, 각 5MB 이하, 총 3장)"),
     is_public: bool = Form(True, description="랜턴을 공개할지 여부"),
+    date: str = Form(..., description="날짜 (yyyy-mm-dd 형식)"),
 ):
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise InvalidDateFormatError(date)
+
     db = get_mongo_client(request)
     validate_name(name)
     validate_images(images)
