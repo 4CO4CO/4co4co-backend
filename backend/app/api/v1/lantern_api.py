@@ -141,7 +141,8 @@ async def create_lanterns(
     lantern_id = await lantern_service.create_lanterns(
         name=name,
         images=images,
-        is_public=is_public
+        is_public=is_public,
+        date=date,
     )
 
     return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")

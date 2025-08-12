@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict, field_serializer
 
@@ -34,6 +34,7 @@ class LanternDBModel(BaseModel):
     music_tasks: List[str] = []
     music_statuses: List[MusicStatusInfo] = []
     is_public: bool
+    event_date: Optional[date] = None
     created_at: datetime
 
     @field_serializer('id')

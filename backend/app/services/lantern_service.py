@@ -32,7 +32,8 @@ class LanternService:
             self,
             name: str,
             images: List[UploadFile],
-            is_public: bool = True
+            is_public: bool = True,
+            date: str = None,
     ) -> str:
         # 1) 랜턴 ID 생성
         MAX_RETRY = 5
@@ -76,6 +77,10 @@ class LanternService:
                 )
             )
 
+        event_date = None
+        if date:
+            event_date = datetime.strptime(date, "%Y-%m-%d").date()
+
         # 4) 기본 랜턴 문서 삽입
         lantern_doc = LanternDBModel(
             lantern_id=lantern_id,
@@ -85,6 +90,7 @@ class LanternService:
             music_tasks=task_ids,
             music_statuses=music_statuses,
             is_public=is_public,
+            event_date=event_date,
             created_at=datetime.utcnow()
         )
         await self.lantern_repo.insert_lantern(lantern_doc.model_dump(exclude={'id'}))
