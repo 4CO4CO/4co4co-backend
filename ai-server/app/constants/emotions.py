@@ -1,0 +1,20 @@
+from enum import Enum
+
+class EmotionEnum(str, Enum):
+    happiness = "Happiness"
+    confidence = "Confidence"
+    surprise = "Surprise"
+    pain = "Pain"
+    disquietment = "Disquietment"
+    fear = "Fear"
+    yearning = "Yearning"
+    excitement = "Excitement"
+    embarrassment = "Embarrassment"
+    affection = "Affection"
+    aversion = "Aversion"
+    engagement = "Engagement"
+    anticipation = "Anticipation"
+    sensitivity = "Sensitivity"
+    annoyance = "Annoyance"
+    sympathy = "Sympathy"
+    pleasure = "Pleasure"
