@@ -6,7 +6,7 @@ from botocore.exceptions import ClientError
 from fastapi import UploadFile
 
 from app.core.config.settings import settings
-from app.core.logging import get_logger
+from app.core.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
