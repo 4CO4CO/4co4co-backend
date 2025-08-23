@@ -53,7 +53,8 @@ def get_logger(name: str):
 
         # uvicorn.error 로거에도 Discord 핸들러 추가
         uvicorn_logger = logging.getLogger("uvicorn.error")
-        uvicorn_logger.addHandler(discord_handler)
+        if not any(isinstance(h, DiscordHandler) for h in uvicorn_logger.handlers):
+            uvicorn_logger.addHandler(discord_handler)
 
     logger.propagate = False
     return logger
