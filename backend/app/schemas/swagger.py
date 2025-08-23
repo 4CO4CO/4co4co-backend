@@ -1,6 +1,3 @@
-from typing import List
-
-from app.schemas.db.lantern import MusicStatusInfo
 from app.schemas.response.schemas import ErrorResponseModel, ResponseModel
 
 success_200_create_lantern = {

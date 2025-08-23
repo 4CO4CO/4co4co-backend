@@ -1,5 +1,3 @@
-import time
-
 from app.core.db.database import get_db
 from app.core.logging.logger import get_logger
 from app.core.tasks.celery_app import celery_app

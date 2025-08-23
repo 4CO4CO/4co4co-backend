@@ -6,11 +6,11 @@ from fastapi import UploadFile
 
 from app.core.config.s3 import upload_file_to_s3
 from app.core.exceptions.types import FileSaveError, NotFoundError, ForbiddenError, ValidationError
+from app.core.tasks.music_tasks import process_lantern_music
 from app.repositories.lantern_repository import LanternRepository
 from app.schemas.db.lantern import LanternDBModel, ImageInfo, MusicStatusInfo
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
-from app.core.tasks.music_tasks import process_lantern_music
 
 
 def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
