@@ -1,15 +1,13 @@
-import logging
 import traceback
-
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.core.config.settings import settings  # 환경 구분용
+from app.core.config.settings import settings
 from app.core.exceptions.types import AppError
+from app.core.logging.logger import get_logger
 
-# 로거 설정
-logger = logging.getLogger("uvicorn.error")
+logger = get_logger(__name__)
 
 
 # RequestValidationError 처리 핸들러 (400 Bad Request)
@@ -22,7 +20,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         "message": "입력 형식이 올바르지 않습니다."
     }
 
-    # 개발 환경이면 debug info 추가
     if settings.APP_ENV == "development":
         response_data["debug_info"] = {
             "location": f"{request.method} {request.url.path}",
@@ -46,8 +43,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # AppError (커스텀 예외) 처리 핸들러
 async def app_error_handler(request: Request, exc: AppError):
-    status_code = getattr(exc, 'status_code', 500)
-    error_code = getattr(exc, 'error_code', 'UNKNOWN_ERROR')
+    status_code = getattr(exc, "status_code", 500)
+    error_code = getattr(exc, "error_code", "UNKNOWN_ERROR")
     message = str(exc)
 
     response_data = {
@@ -56,7 +53,6 @@ async def app_error_handler(request: Request, exc: AppError):
         "message": message
     }
 
-    # 개발 환경이면 debug info 추가
     if settings.APP_ENV == "development":
         response_data["debug_info"] = {
             "location": f"{request.method} {request.url.path}",
@@ -70,7 +66,8 @@ async def app_error_handler(request: Request, exc: AppError):
         request.url.path,
         error_code,
         message,
-        response_data
+        response_data,
+        exc_info=True
     )
 
     return JSONResponse(
@@ -81,7 +78,12 @@ async def app_error_handler(request: Request, exc: AppError):
 
 # 500 Internal Server Error 처리 핸들러
 async def generic_exception_handler(request: Request, exc: Exception):
-    logger.exception(f"[Unhandled Exception] {request.method} {request.url.path} - {exc}")
+    logger.exception(
+        "[Unhandled Exception] %s %s - %s",
+        request.method,
+        request.url.path,
+        str(exc)
+    )
 
     response_data = {
         "status": "error",

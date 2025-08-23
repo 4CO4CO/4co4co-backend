@@ -1,3 +1,5 @@
+import time
+
 from app.core.db.database import get_db
 from app.core.logging.logger import get_logger
 from app.core.tasks.celery_app import celery_app
@@ -23,8 +25,9 @@ def process_lantern_music(
     image_key 하나에 대해 MusicService.generate_music을 호출하고,
     생성된 s3_key를 반환하고, DB에 상태를 'success'로 업데이트합니다.
     """
+    start_time = time.time()
     try:
-        logger.info(f"Starting music generation task for lantern_id={lantern_id}, image_key={image_key}")
+        logger.info(f"[Task Start] lantern_id={lantern_id}, image_key={image_key}")
         db = get_db()
         service = MusicService(db)
 
@@ -46,11 +49,16 @@ def process_lantern_music(
             }
         )
 
-        logger.info(f"Music generated successfully for image_key={image_key}, s3_key={s3_key}")
+        elapsed = round(time.time() - start_time, 2)
+        logger.info(f"[Task Success] image_key={image_key}, s3_key={s3_key}, elapsed={elapsed}s")
         return s3_key
 
     except Exception as e:
-        logger.error(f"Music generation task failed for lantern_id={lantern_id}, image_key={image_key}: {e}", exc_info=True)
+        elapsed = round(time.time() - start_time, 2)
+        logger.error(
+            f"[Task Failed] lantern_id={lantern_id}, image_key={image_key}, elapsed={elapsed}s, error={e}",
+            exc_info=True
+        )
 
         # 상태 업데이트: 'failed'
         try:
@@ -65,6 +73,8 @@ def process_lantern_music(
                 }
             )
         except Exception as update_error:
-            logger.warning(f"Failed to update task failure status for image_key={image_key}: {update_error}")
+            logger.warning(
+                f"[Task Update Failed] image_key={image_key}, update_error={update_error}"
+            )
 
         raise e
