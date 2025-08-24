@@ -1,7 +1,7 @@
 import logging
 import os
 import requests
-from app.core.settings import settings
+from app.utils.settings import settings
 
 
 class DiscordHandler(logging.Handler):

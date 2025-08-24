@@ -1,7 +1,7 @@
 from fastapi.responses import JSONResponse
 from fastapi import Request
-from app.core.exceptions import AIServerError
-from app.core.response import error_response
+from app.utils.exceptions import AIServerError
+from app.utils.response import error_response
 
 
 async def ai_server_error_handler(request: Request, exc: AIServerError):

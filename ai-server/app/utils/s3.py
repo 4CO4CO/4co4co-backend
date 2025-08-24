@@ -1,5 +1,7 @@
 import asyncio
 import io
+import soundfile as sf
+from PIL import Image
 from typing import Optional, Tuple
 from uuid import uuid4
 
@@ -8,8 +10,8 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
 
-from app.core.logger import get_logger
-from app.core.settings import settings
+from app.utils.logger import get_logger
+from app.utils.settings import settings
 
 
 logger = get_logger(__name__)
@@ -63,7 +65,7 @@ class S3Service:
             logger.info("[S3Service] S3 client closed")
 
 
-# Global S3 service instance
+# Global S3 services instance
 s3_service = S3Service()
 
 
@@ -195,11 +197,70 @@ async def get_file_url_from_s3(s3_key: str, expires_in: int = 3600) -> Optional[
 
 # Lifecycle events for FastAPI app
 async def init_s3_service():
-    """Initialize S3 service"""
+    """Initialize S3 services"""
     logger.info("[S3 Service] Initializing...")
 
 
 async def close_s3_service():
-    """Shutdown S3 service and close connections"""
+    """Shutdown S3 services and close connections"""
     logger.info("[S3 Service] Closing connections...")
     await s3_service.close()
+
+
+async def download_image_from_s3(s3_key: str) -> Image.Image:
+    """
+    Download an image from S3 and return it as a PIL Image.
+    """
+    try:
+        s3_client = await s3_service.get_s3_client()
+        obj = await s3_client.get_object(
+            Bucket=settings.AWS_S3_BUCKET_NAME,
+            Key=s3_key
+        )
+        body = await obj["Body"].read()
+        return Image.open(io.BytesIO(body)).convert("RGB")
+    except Exception as e:
+        logger.exception(f"[S3 Download] Failed: key={s3_key}, error={str(e)}")
+        raise
+
+
+async def upload_audio(audio_tensor, sample_rate: int, folder: str = "audios") -> str:
+    """
+    Convert generated audio tensor to WAV and upload to S3.
+
+    Args:
+        audio_tensor: Torch tensor or numpy array (waveform)
+        sample_rate (int): Sampling rate
+        folder (str): Destination folder in S3
+
+    Returns:
+        str: Uploaded S3 key
+    """
+    try:
+        # Convert to numpy
+        if hasattr(audio_tensor, "cpu"):
+            audio_np = audio_tensor.squeeze().cpu().numpy()
+        else:
+            audio_np = audio_tensor
+
+        # Encode WAV to memory buffer
+        buf = io.BytesIO()
+        sf.write(buf, audio_np, sample_rate, format="WAV")
+        buf.seek(0)
+
+        # Generate unique key
+        s3_key = f"{folder}/{uuid4()}.wav"
+
+        s3_client = await s3_service.get_s3_client()
+        await s3_client.upload_fileobj(
+            buf,
+            settings.AWS_S3_BUCKET_NAME,
+            s3_key,
+            ExtraArgs={"ContentType": "audio/wav"}
+        )
+
+        logger.info(f"[S3 Audio Upload] Success: key={s3_key}")
+        return s3_key
+    except Exception as e:
+        logger.exception(f"[S3 Audio Upload] Failed: {e}")
+        raise

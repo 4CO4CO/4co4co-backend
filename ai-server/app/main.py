@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 
 from app.api.v1.music_api import router as music_router
-from app.core.exception_handlers import ai_server_error_handler
-from app.core.exceptions import AIServerError
+from app.utils.exception_handlers import ai_server_error_handler
+from app.utils.exceptions import AIServerError
 from app.music.model import model, model_lock
 
 app = FastAPI()

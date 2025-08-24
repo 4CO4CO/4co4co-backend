@@ -10,7 +10,6 @@ model_lock = Lock()
 model = MusicGen.get_pretrained("facebook/musicgen-small", device=device)
 SAMPLE_RATE = getattr(model, "sample_rate", 32000)
 
-
 @contextmanager
 def model_session():
     """
