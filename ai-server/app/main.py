@@ -8,7 +8,6 @@ from app.music.model import model, model_lock
 app = FastAPI()
 
 app.include_router(music_router, prefix="/api/v1")
-app.include_router(emotion_router, prefix="/api/v1") 
 app.add_exception_handler(AIServerError, ai_server_error_handler)
 
 

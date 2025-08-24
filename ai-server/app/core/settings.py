@@ -3,6 +3,14 @@ from pydantic import Field
 
 
 class Settings(BaseSettings):
+    # Environment
+    APP_ENV: str = Field("production", description="Application environment (e.g., production, development)")
+    LOG_LEVEL: str = Field("INFO", description="Log level (DEBUG, INFO, WARNING, ERROR)")
+    DISCORD_WEBHOOK_URL: str | None = Field(
+        None,
+        description="Discord Webhook URL for error alerts (optional)"
+    )
+
     AWS_ACCESS_KEY_ID: str = Field(
         ..., min_length=16, max_length=128, description="AWS Access Key ID"
     )
