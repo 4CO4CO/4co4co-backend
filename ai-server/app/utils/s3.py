@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import aioboto3
 from botocore.config import Config
-from botocore.exceptions import ClientError
 from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
 
@@ -44,7 +43,7 @@ class S3Service:
                     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                     aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
                     region_name=settings.AWS_REGION,
-                    config=Config(retries={"max_attempts": 3, "mode": "adaptive"})
+                    config=Config(retries={"max_attempts": 3, "mode": "adaptive"}),
                 )
                 self._s3_client = await self._client_cm.__aenter__()
                 logger.info("[S3Service] S3 client initialized")
@@ -71,6 +70,10 @@ s3_service = S3Service()
 async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[Optional[str], int]:
     """Upload a file to S3 asynchronously using streaming (memory efficient)."""
     try:
+        # 항상 처음부터 읽히도록 보장
+        file.file.seek(0, io.SEEK_SET)
+
+        # 파일 사이즈 계산
         try:
             file_obj = file.file
             pos = file_obj.tell()
@@ -81,10 +84,12 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[
             file_size = 0
             logger.warning(f"[S3 Upload] Failed to calculate file size: {file.filename}")
 
+        # S3 key 생성
         safe_folder = (folder or "uploads").strip("/")
         ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else ""
         s3_key = f"{safe_folder}/{uuid4()}{('.' + ext) if ext else ''}"
 
+        # 업로드 실행
         s3_client = await s3_service.get_s3_client()
         await s3_client.upload_fileobj(
             file.file,
@@ -92,16 +97,24 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[
             s3_key,
             ExtraArgs={
                 "ContentType": file.content_type or "application/octet-stream",
-                "Metadata": {"original_filename": file.filename or "unknown", "file_size": str(file_size)}
-            }
+                "Metadata": {
+                    "original_filename": file.filename or "unknown",
+                    "file_size": str(file_size),
+                },
+            },
         )
         logger.info(f"[S3 Upload] Success: key={s3_key}")
         return s3_key, file_size
+
     except Exception as e:
         logger.exception(f"[S3 Upload] Failed: {e}")
         return None, 0
+
     finally:
-        file.file.seek(0)
+        try:
+            file.file.seek(0)
+        except Exception:
+            pass
 
 
 async def delete_file_from_s3(s3_key: str) -> bool:
@@ -146,7 +159,7 @@ async def upload_audio(audio_tensor, sample_rate: int, folder: str = "audios") -
             buf,
             settings.AWS_S3_BUCKET_NAME,
             s3_key,
-            ExtraArgs={"ContentType": "audio/wav"}
+            ExtraArgs={"ContentType": "audio/wav"},
         )
         logger.info(f"[S3 Audio Upload] Success: key={s3_key}")
         return s3_key
@@ -159,31 +172,25 @@ async def upload_audio(audio_tensor, sample_rate: int, folder: str = "audios") -
 # Presigned URL
 # --------------------
 
-def get_file_url_from_s3(s3_key: str, expires_in: int = 3600) -> Optional[str]:
-    """(Sync) Generate a presigned URL directly from boto3 client (simple use-case)."""
-    try:
-        loop = asyncio.get_event_loop()
-        s3_client = loop.run_until_complete(s3_service.get_s3_client())
-        return s3_client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": settings.AWS_S3_BUCKET_NAME, "Key": s3_key},
-            ExpiresIn=expires_in,
-        )
-    except Exception as e:
-        logger.exception(f"[S3 Presigned URL] Failed: {e}")
-        return None
-
-
 async def generate_presigned_url(s3_key: str, expires_in: int = 3600) -> Optional[str]:
-    """(Async) Generate a presigned URL using threadpool to avoid blocking event loop."""
+    """Generate a presigned URL for GET request."""
     try:
         s3_client = await s3_service.get_s3_client()
-        url = await run_in_threadpool(
-            s3_client.generate_presigned_url,
-            "get_object",
-            Params={"Bucket": settings.AWS_S3_BUCKET_NAME, "Key": s3_key},
-            ExpiresIn=expires_in,
-        )
+
+        if asyncio.iscoroutinefunction(s3_client.generate_presigned_url):
+            url = await s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": settings.AWS_S3_BUCKET_NAME, "Key": s3_key},
+                ExpiresIn=expires_in,
+            )
+        else:
+            url = await run_in_threadpool(
+                s3_client.generate_presigned_url,
+                "get_object",
+                Params={"Bucket": settings.AWS_S3_BUCKET_NAME, "Key": s3_key},
+                ExpiresIn=expires_in,
+            )
+
         logger.info(f"[S3 Presigned URL] Generated: key={s3_key}, expires_in={expires_in}")
         return url
     except Exception as e:
