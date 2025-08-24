@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # 환경
     APP_ENV: str = Field("production")
+    LOG_LEVEL: str = Field("INFO", description="로그 레벨 (DEBUG, INFO, WARNING, ERROR)")
+    DISCORD_WEBHOOK_URL: str | None = Field(None, description="Discord Webhook URL for error alerts")
 
     # MongoDB
     MONGO_URI: str = Field(...)
@@ -36,5 +38,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
 
 settings = Settings()

@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     global mongo_client
     try:
+        logger.info("MongoDB 클라이언트 생성 및 연결 시도 중...")
         mongo_client = AsyncIOMotorClient(
             settings.MONGO_URI,
             maxPoolSize=settings.MONGO_MAX_POOL_SIZE,
@@ -22,7 +23,6 @@ async def lifespan(app: FastAPI):
         )
         app.mongodb_client = mongo_client
         app.database = mongo_client[settings.MONGO_DB]
-        logger.info("MongoDB 클라이언트 생성 및 연결 시도 중...")
 
         # 연결 테스트 (ping)
         await app.database.command("ping")
@@ -36,18 +36,19 @@ async def lifespan(app: FastAPI):
         )
         logger.info("lantern_id에 대한 unique index 보장 완료")
 
+        logger.info("MongoDB lifespan setup 완료")
         yield
 
     except Exception as e:
-        logger.error(f"MongoDB 연결 실패: {e}")
+        logger.exception("MongoDB 연결 실패")
         raise e
 
     finally:
         try:
             mongo_client.close()
             logger.info("MongoDB 클라이언트 연결 종료")
-        except Exception as close_err:
-            logger.error(f"MongoDB 종료 중 에러 발생: {close_err}")
+        except Exception:
+            logger.exception("MongoDB 종료 중 에러 발생")
 
 
 def get_mongo_client(request: Request):

@@ -16,10 +16,9 @@ class LanternRepository:
 
     async def find_by_lantern_id(self, lantern_id):
         try:
-            user = await self.collection.find_one({"lantern_id": lantern_id})
-            return user
+            return await self.collection.find_one({"lantern_id": lantern_id})
         except Exception as e:
-            raise DatabaseError(f"Database query failed: {e}") from e
+            raise DatabaseError(f"find_by_lantern_id failed for {lantern_id}: {e}") from e
 
     async def count_documents(self, filter_dict):
         try:

@@ -9,15 +9,21 @@ from sse_starlette.sse import EventSourceResponse
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_client
 from app.core.exceptions.types import InvalidResumeEventError, NotFoundError
+from app.core.logging.logger import get_logger
 from app.core.response.response import success_response, success_no_cache_response
 from app.core.validation.lantern_validation import validate_name, validate_images
 from app.repositories.lantern_repository import LanternRepository
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
 from app.schemas.response.schemas import ResponseModel
-from app.schemas.swagger import error_400, error_403, error_404, error_500, error_400_lantern_examples, \
-    success_200_create_lantern, success_200_music_status
+from app.schemas.swagger import (
+    error_400, error_403, error_404, error_500,
+    error_400_lantern_examples, success_200_create_lantern,
+    success_200_music_status
+)
 from app.services.lantern_service import LanternService
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -46,15 +52,20 @@ async def music_status(
     start_time = time.time()
     sent_task_ids = set()
 
+    logger.info(f"[music_status] Lantern ID 요청: {lantern_id}, resume={resume}, last_event_id={last_event_id}")
+
     doc = await repo.find_by_lantern_id(lantern_id)
     if not doc:
+        logger.warning(f"[music_status] Lantern '{lantern_id}' not found")
         raise NotFoundError(f"Lantern ID '{lantern_id}' not found")
 
     if resume and last_event_id:
         valid_ids = {s["task_id"] for s in doc.get("music_statuses", [])}
         if last_event_id in valid_ids:
             sent_task_ids.add(last_event_id)
+            logger.info(f"[music_status] Resumed from last_event_id={last_event_id}")
         else:
+            logger.error(f"[music_status] Invalid resume event: {last_event_id}")
             raise InvalidResumeEventError(last_event_id)
 
     polling_interval = getattr(settings, 'SSE_POLLING_INTERVAL', 3)
@@ -64,12 +75,15 @@ async def music_status(
         while True:
             try:
                 if await request.is_disconnected():
+                    logger.info(f"[music_status] Client disconnected: {lantern_id}")
                     break
                 if time.time() - start_time > settings.SSE_TIMEOUT:
+                    logger.info(f"[music_status] SSE timeout: {lantern_id}")
                     break
 
                 doc = await repo.find_by_lantern_id(lantern_id)
                 if not doc:
+                    logger.warning(f"[music_status] Lantern '{lantern_id}' deleted during SSE")
                     yield {
                         "event": "error",
                         "data": json.dumps({"error": f"Lantern ID '{lantern_id}' not found"})
@@ -81,7 +95,9 @@ async def music_status(
                     s for s in statuses
                     if s["status"] == "success" and s["task_id"] not in sent_task_ids
                 ]
+
                 for s in new_completed:
+                    logger.info(f"[music_status] Task completed: task_id={s['task_id']}, lantern_id={lantern_id}")
                     yield {
                         "id": s["task_id"],
                         "event": "music_done_partial",
@@ -91,6 +107,7 @@ async def music_status(
 
                 if all(s["status"] == "success" for s in statuses) and len(statuses) > 0:
                     if "done-all" not in sent_task_ids:
+                        logger.info(f"[music_status] All tasks completed for lantern_id={lantern_id}")
                         yield {
                             "id": "done-all",
                             "event": "music_done_all",
@@ -100,6 +117,7 @@ async def music_status(
                     break
 
             except Exception as e:
+                logger.exception(f"[music_status] Database query failed for lantern_id={lantern_id}")
                 yield {
                     "event": "error",
                     "data": json.dumps({"error": "Database query failed", "detail": str(e)})
@@ -126,6 +144,8 @@ async def create_lanterns(
     images: List[UploadFile] = File(..., description="이미지 파일 (jpg, jpeg, png, webp, 각 5MB 이하, 총 3장)"),
     is_public: bool = Form(True, description="랜턴을 공개할지 여부"),
 ):
+    logger.info(f"[create_lanterns] New lantern requested: name={name}, is_public={is_public}")
+
     db = get_mongo_client(request)
     validate_name(name)
     validate_images(images)
@@ -137,6 +157,7 @@ async def create_lanterns(
         is_public=is_public
     )
 
+    logger.info(f"[create_lanterns] Lantern created successfully: {lantern_id}")
     return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")
 
 
@@ -158,6 +179,8 @@ async def get_lantern_list(
         regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
     )
 ):
+    logger.info(f"[get_lantern_list] Fetching lantern list, current_lantern_id={current_lantern_id}")
+
     db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lanterns = await lantern_service.get_recent_lanterns(current_lantern_id=current_lantern_id)
@@ -186,6 +209,8 @@ async def get_lantern_detail(
         regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
     )
 ):
+    logger.info(f"[get_lantern_detail] Fetching detail for lantern_id={lantern_id}")
+
     db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lantern = await lantern_service.get_lantern_detail(lantern_id)
