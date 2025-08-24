@@ -10,14 +10,19 @@ from app.core.logging.logger import get_logger
 logger = get_logger(__name__)
 
 
-# RequestValidationError 처리 핸들러 (400 Bad Request)
+# Handler for RequestValidationError (400 Bad Request)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    first_error = exc.errors()[0]["msg"] if exc.errors() else "입력 형식이 올바르지 않습니다."
+    """
+    Handle FastAPI's built-in validation errors (e.g., invalid request body/query).
+    - Returns a 400 Bad Request with standardized error response.
+    - Includes debug info if running in development mode.
+    """
+    first_error = exc.errors()[0]["msg"] if exc.errors() else "Invalid input format."
 
     response_data = {
         "status": "error",
         "error_code": "INVALID_INPUT_FORMAT",
-        "message": "입력 형식이 올바르지 않습니다."
+        "message": "Invalid input format."
     }
 
     if settings.APP_ENV == "development":
@@ -41,8 +46,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-# AppError (커스텀 예외) 처리 핸들러
+# Handler for custom AppError
 async def app_error_handler(request: Request, exc: AppError):
+    """
+    Handle application-defined exceptions (AppError).
+    - Returns the status_code and error_code defined in the exception
+    - Falls back to 500 INTERNAL_SERVER_ERROR if not specified
+    """
     status_code = getattr(exc, "status_code", 500)
     error_code = getattr(exc, "error_code", "UNKNOWN_ERROR")
     message = str(exc)
@@ -76,8 +86,14 @@ async def app_error_handler(request: Request, exc: AppError):
     )
 
 
-# 500 Internal Server Error 처리 핸들러
+# Handler for uncaught generic exceptions (500 Internal Server Error)
 async def generic_exception_handler(request: Request, exc: Exception):
+    """
+    Handle unexpected/unhandled exceptions.
+    - Always returns a 500 Internal Server Error
+    - Logs stack trace and exception details
+    - Includes debug info in development mode
+    """
     logger.exception(
         "[Unhandled Exception] %s %s - %s",
         request.method,
@@ -88,7 +104,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
     response_data = {
         "status": "error",
         "error_code": "INTERNAL_SERVER_ERROR",
-        "message": "서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        "message": "An internal server error occurred. Please try again later."
     }
 
     if settings.APP_ENV == "development":

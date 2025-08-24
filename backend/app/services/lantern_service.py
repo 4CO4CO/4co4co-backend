@@ -17,6 +17,10 @@ logger = get_logger(__name__)
 
 
 def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
+    """
+    Convert a lantern document from DB into a LanternResponseModel.
+    Used for list responses (lightweight).
+    """
     return LanternResponseModel(
         lantern_id=doc["lantern_id"],
         owner_name=doc["user_name"],
@@ -25,11 +29,16 @@ def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternRes
 
 
 class LanternService:
+    """
+    Service layer for lantern-related operations.
+    Handles creation, retrieval, and detail fetching of lanterns.
+    """
+
     def __init__(self, db):
         self.lantern_repo = LanternRepository(db)
 
     """
-    랜턴 생성
+    Create a new lantern
     """
     async def create_lanterns(
             self,
@@ -39,7 +48,6 @@ class LanternService:
     ) -> str:
         logger.info(f"[LanternService] Creating lantern for user={name}, is_public={is_public}")
 
-        # 1) 랜턴 ID 생성
         MAX_RETRY = 5
         for _ in range(MAX_RETRY):
             code = str(random.randint(1000, 9999))
@@ -50,7 +58,6 @@ class LanternService:
             logger.error(f"[LanternService] Failed to create unique lantern_id for user={name}")
             raise ValidationError("Duplicate lantern ID")
 
-        # 2) 이미지 S3 업로드
         uploaded_images: List[ImageInfo] = []
         for img in images:
             path, orig, ext, size = await self._upload_image_to_s3(img)
@@ -64,7 +71,6 @@ class LanternService:
             )
             logger.info(f"[LanternService] Image uploaded to S3: {path}, size={size} bytes")
 
-        # 3) Celery 태스크 등록 및 상태 정보 구성
         task_ids: List[str] = []
         music_statuses: List[MusicStatusInfo] = []
         for info in uploaded_images:
@@ -84,7 +90,6 @@ class LanternService:
             )
             logger.info(f"[LanternService] Music task queued: task_id={task.id}, image_s3={info.s3_path}")
 
-        # 4) 기본 랜턴 문서 삽입
         lantern_doc = LanternDBModel(
             lantern_id=lantern_id,
             user_name=name,
@@ -98,17 +103,15 @@ class LanternService:
         await self.lantern_repo.insert_lantern(lantern_doc.model_dump(exclude={'id'}))
         logger.info(f"[LanternService] Lantern created successfully: lantern_id={lantern_id}")
 
-        # 5) 클라이언트에는 lantern_id만 반환
         return lantern_id
 
     """
-    최근 랜턴 조회 (최신 랜턴 + 랜덤 추천 조합)
+    Fetch recent lanterns (combination of current lantern + random recommendations)
     """
     async def get_recent_lanterns(self, current_lantern_id: Optional[str] = None, limit: int = 20):
         logger.info(f"[LanternService] Fetching recent lanterns, current_lantern_id={current_lantern_id}, limit={limit}")
         current_doc = None
 
-        # 현재 선택된 랜턴 ID가 존재하면 먼저 조회
         if current_lantern_id:
             current_doc = await self.lantern_repo.find_by_lantern_id(current_lantern_id)
             if not current_doc:
@@ -117,10 +120,9 @@ class LanternService:
                     message=f"Lantern ID {current_lantern_id} not found.",
                     error_code="LANTERN_NOT_FOUND"
                 )
-            limit -= 1  # 나머지 추천 수 조정
+            limit -= 1
             logger.info(f"[LanternService] Current lantern found: {current_lantern_id}")
 
-        # 나머지 랜덤 랜턴 목록 조회
         other_docs = await self.lantern_repo.find_random_lanterns(
             exclude_lantern_id=current_lantern_id if current_doc else None,
             limit=limit
@@ -131,7 +133,7 @@ class LanternService:
         return [to_lantern_model(doc, current_lantern_id) for doc in docs]
 
     """
-    특정 랜턴 상세 조회
+    Fetch detailed information about a specific lantern
     """
     async def get_lantern_detail(self, lantern_id: str):
         logger.info(f"[LanternService] Fetching detail for lantern_id={lantern_id}")
@@ -158,7 +160,10 @@ class LanternService:
             music["s3_path"] for music in lantern.get("musics", []) if "s3_path" in music
         ]
 
-        logger.info(f"[LanternService] Lantern detail fetched: lantern_id={lantern_id}, images={len(image_paths)}, musics={len(background_sounds)}")
+        logger.info(
+            f"[LanternService] Lantern detail fetched: lantern_id={lantern_id}, "
+            f"images={len(image_paths)}, musics={len(background_sounds)}"
+        )
 
         return LanternDetailResponseModel(
             lantern_id=lantern["lantern_id"],
@@ -168,7 +173,7 @@ class LanternService:
         )
 
     """
-    S3에 이미지 업로드 후 파일 정보 반환
+    Upload an image to S3 and return file metadata
     """
     @staticmethod
     async def _upload_image_to_s3(image):
@@ -182,6 +187,5 @@ class LanternService:
             return s3_key, original_filename, file_extension, file_size
 
         except Exception as e:
-            # 업로드 실패 시 로깅
             logger.error(f"[LanternService] File upload failed: {original_filename}, error={e}", exc_info=True)
             raise FileSaveError(f"File upload failed: {e}") from e
