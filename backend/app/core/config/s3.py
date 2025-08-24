@@ -47,7 +47,6 @@ class S3Service:
                 )
                 # Enter the context manager → initialize the connection pool
                 self._s3_client = await self._client_cm.__aenter__()
-
                 logger.info("[S3Service] S3 client initialized")
 
         return self._s3_client
@@ -69,7 +68,7 @@ s3_service = S3Service()
 
 async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[Optional[str], int]:
     """
-    Upload a file to S3 asynchronously.
+    Upload a file to S3 asynchronously using streaming (memory efficient).
 
     Args:
         file: The file to be uploaded
@@ -78,27 +77,30 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[
     Returns:
         Tuple[Optional[str], int]: (S3 key, file size) or (None, 0) if failed
     """
-    s3_client = None
     try:
-        # Read file content
-        file_content = await file.read()
-        file_size = len(file_content)
+        # Compute file size without loading entire content into memory
+        try:
+            file_obj = file.file  # SpooledTemporaryFile
+            pos = file_obj.tell()
+            file_obj.seek(0, io.SEEK_END)
+            file_size = file_obj.tell()
+            file_obj.seek(0)
+        except Exception:
+            file_size = 0
+            logger.warning(f"[S3 Upload] Failed to calculate file size: {file.filename}")
 
-        # Extract file extension and generate S3 key
-        file_extension = ""
-        if file.filename and "." in file.filename:
-            file_extension = file.filename.split('.')[-1]
-
-        s3_file_key = f"{folder}/{uuid4()}.{file_extension}" if file_extension else f"{folder}/{uuid4()}"
+        # Generate safe folder and file key
+        safe_folder = (folder or "uploads").strip("/")
+        file_extension = file.filename.split(".")[-1] if file.filename and "." in file.filename else ""
+        s3_file_key = f"{safe_folder}/{uuid4()}{('.' + file_extension) if file_extension else ''}"
 
         logger.info(f"[S3 Upload] Start: filename={file.filename}, size={file_size}, key={s3_file_key}")
 
-        # Get S3 client
         s3_client = await s3_service.get_s3_client()
 
-        # Upload to S3 asynchronously
+        # Streaming upload (avoids OOM)
         await s3_client.upload_fileobj(
-            io.BytesIO(file_content),
+            file.file,
             settings.AWS_S3_BUCKET_NAME,
             s3_file_key,
             ExtraArgs={
@@ -124,7 +126,7 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[
 
     finally:
         # Reset file pointer for possible reuse
-        await file.seek(0)
+        file.file.seek(0)
 
 
 async def delete_file_from_s3(s3_key: str) -> bool:
@@ -139,12 +141,10 @@ async def delete_file_from_s3(s3_key: str) -> bool:
     """
     try:
         s3_client = await s3_service.get_s3_client()
-
         await s3_client.delete_object(
             Bucket=settings.AWS_S3_BUCKET_NAME,
             Key=s3_key
         )
-
         logger.info(f"[S3 Delete] Success: key={s3_key}, bucket={settings.AWS_S3_BUCKET_NAME}")
         return True
 
@@ -171,7 +171,6 @@ async def get_file_url_from_s3(s3_key: str, expires_in: int = 3600) -> Optional[
     """
     try:
         s3_client = await s3_service.get_s3_client()
-
         url = s3_client.generate_presigned_url(
             'get_object',
             Params={
@@ -180,7 +179,6 @@ async def get_file_url_from_s3(s3_key: str, expires_in: int = 3600) -> Optional[
             },
             ExpiresIn=expires_in
         )
-
         logger.info(f"[S3 URL] Generated: key={s3_key}, expires_in={expires_in}")
         return url
 
