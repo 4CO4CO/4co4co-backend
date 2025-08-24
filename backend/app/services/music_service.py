@@ -15,9 +15,10 @@ def call_ai_server(
     image: str,
 ) -> str:
     """
-    AI 서버에 단일 이미지 키와 설명을 보내고,
-    성공 시 data.s3_key를 반환합니다.
-    실패 시 AppError로 처리합니다.
+    Call the AI server with a single image key to generate music.
+    - Sends a POST request with {"image": image}
+    - Returns the generated s3_key on success
+    - Raises AppError on failure (request error or invalid response)
     """
     url = f"{settings.AI_SERVER_URL}{settings.API_PREFIX}/generate-music"
     payload = {"image": image}
@@ -32,6 +33,7 @@ def call_ai_server(
         logger.error(f"[AI Server] Request failed: {e}", exc_info=True)
         raise AppError(f"AI server request failed: {e}")
 
+    # Validate response
     if body.get("status") != "success":
         logger.error(f"[AI Server] Returned error: {body.get('message', 'unknown')}")
         raise AppError(f"AI returned error: {body.get('message', 'unknown')}")
@@ -46,6 +48,13 @@ def call_ai_server(
 
 
 class MusicService:
+    """
+    Service layer for music generation.
+    - Validates lantern existence
+    - Calls AI server to generate music
+    - Saves generated music metadata into the lantern document
+    """
+
     def __init__(self, db):
         self.db = db
         self.lantern_repo = LanternRepository(db)
@@ -56,28 +65,33 @@ class MusicService:
         image: str,
     ) -> str:
         """
-        lantern_id에 해당하는 Lantern가 존재하는지 확인한 뒤,
-        단일 image 키를 AI 서버에 보내 음악을 생성하고
-        반환된 s3_key를 DB에 저장하고 리턴합니다.
+        Generate background music for a given lantern and image.
+        Workflow:
+        1. Validate lantern existence in DB
+        2. Call AI server with the image key
+        3. Create a MusicInfo entry
+        4. Push the music metadata into the lantern document
+        Returns:
+            str: s3_key of the generated music file
         """
         logger.info(f"[MusicService] Generate music start: lantern_id={lantern_id}, image={image}")
 
-        # 1) Lantern 존재 확인 (동기)
+        # 1) Ensure lantern exists
         lantern = self.lantern_repo.collection.find_one({"lantern_id": lantern_id})
         if not lantern:
             logger.warning(f"[MusicService] Lantern not found: {lantern_id}")
             raise NotFoundError(f"Lantern ID {lantern_id} not found.")
 
-        # 2) AI 서버 호출
+        # 2) Call AI server
         s3_key = call_ai_server(image)
 
-        # 3) MusicInfo 모델로 문서 생성
+        # 3) Build MusicInfo document
         music_info = MusicInfo(
             s3_path=s3_key,
             created_at=datetime.utcnow()
         ).model_dump(exclude={"id"})
 
-        # 4) DB 업데이트: musics 배열에 푸시
+        # 4) Update DB: append new music entry
         self.lantern_repo.collection.update_one(
             {"lantern_id": lantern_id},
             {"$push": {"musics": music_info}}

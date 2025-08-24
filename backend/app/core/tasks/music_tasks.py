@@ -21,9 +21,20 @@ def process_lantern_music(
     image_key: str,
 ) -> str:
     """
-    Celery 워커가 실행할 태스크.
-    image_key 하나에 대해 MusicService.generate_music을 호출하고,
-    생성된 s3_key를 반환하고, DB에 상태를 'success'로 업데이트합니다.
+    Celery worker task for generating music from a single image key.
+
+    Workflow:
+    1. Create a MusicService instance with a DB connection
+    2. Call MusicService.generate_music() to generate background music
+    3. Update the corresponding lantern document in MongoDB:
+       - Set status to "success"
+       - Save the generated s3_key
+    4. Return the generated s3_key
+
+    On failure:
+    - Logs the error
+    - Updates the status of the lantern document to "failed"
+    - Retries up to the configured number of times
     """
     start_time = time.time()
     try:
@@ -31,13 +42,13 @@ def process_lantern_music(
         db = get_db()
         service = MusicService(db)
 
-        # 음악 생성
+        # Generate music for the given image
         s3_key = service.generate_music(
             lantern_id=lantern_id,
             image=image_key,
         )
 
-        # 상태 업데이트: 'success'
+        # Update DB status to "success"
         repo = LanternRepository(db)
         repo.collection.update_one(
             {"lantern_id": lantern_id, "music_statuses.image_s3": image_key},
@@ -60,7 +71,7 @@ def process_lantern_music(
             exc_info=True
         )
 
-        # 상태 업데이트: 'failed'
+        # Update DB status to "failed"
         try:
             db = get_db()
             repo = LanternRepository(db)
