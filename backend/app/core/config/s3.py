@@ -1,8 +1,10 @@
+import asyncio
 import io
-from uuid import uuid4
 from typing import Optional, Tuple
+from uuid import uuid4
 
 import aioboto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
 
@@ -13,50 +15,76 @@ logger = get_logger(__name__)
 
 
 class S3Service:
+    """
+    Lazy singleton-style S3 client manager.
+    - First call: opens aioboto3 client context (__aenter__)
+    - Subsequent calls: reuse the same client
+    - Close: properly calls __aexit__ to release the connection pool
+    """
+
     def __init__(self):
         self.session = aioboto3.Session()
-        self._s3_client = None
+        self._s3_client = None          # actual client object
+        self._client_cm = None          # context manager
+        self._lock = asyncio.Lock()     # concurrency control
 
     async def get_s3_client(self):
-        """S3 클라이언트를 가져오거나 생성"""
-        if self._s3_client is None:
-            self._s3_client = self.session.client(
-                "s3",
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                region_name=settings.AWS_REGION
-            )
+        """
+        Returns an initialized S3 client.
+        Creates and enters the client context on the first call.
+        """
+        if self._s3_client:
+            return self._s3_client
+
+        async with self._lock:
+            if self._s3_client is None:
+                self._client_cm = self.session.client(
+                    "s3",
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_REGION,
+                    config=Config(retries={"max_attempts": 3, "mode": "adaptive"})
+                )
+                # Enter the context manager → initialize the connection pool
+                self._s3_client = await self._client_cm.__aenter__()
+
+                logger.info("[S3Service] S3 client initialized")
+
         return self._s3_client
 
     async def close(self):
-        """S3 클라이언트 연결 종료"""
-        if self._s3_client:
-            await self._s3_client.close()
+        """
+        Properly closes the S3 client by exiting the context manager.
+        """
+        if self._client_cm:
+            await self._client_cm.__aexit__(None, None, None)
+            self._client_cm = None
             self._s3_client = None
+            logger.info("[S3Service] S3 client closed")
 
 
-# 전역 S3 서비스 인스턴스
+# Global S3 service instance
 s3_service = S3Service()
 
 
 async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[Optional[str], int]:
     """
-    파일을 S3에 비동기로 업로드
+    Upload a file to S3 asynchronously.
 
     Args:
-        file: 업로드할 파일
-        folder: S3 내 폴더 경로
+        file: The file to be uploaded
+        folder: Folder path inside S3
 
     Returns:
-        Tuple[Optional[str], int]: (S3 키, 파일 크기) 또는 (None, 0) if 실패
+        Tuple[Optional[str], int]: (S3 key, file size) or (None, 0) if failed
     """
     s3_client = None
     try:
-        # 파일 내용 읽기
+        # Read file content
         file_content = await file.read()
         file_size = len(file_content)
 
-        # 파일 확장자 및 S3 키 생성
+        # Extract file extension and generate S3 key
         file_extension = ""
         if file.filename and "." in file.filename:
             file_extension = file.filename.split('.')[-1]
@@ -65,10 +93,10 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[
 
         logger.info(f"[S3 Upload] Start: filename={file.filename}, size={file_size}, key={s3_file_key}")
 
-        # S3 클라이언트 가져오기
+        # Get S3 client
         s3_client = await s3_service.get_s3_client()
 
-        # S3에 비동기 업로드
+        # Upload to S3 asynchronously
         await s3_client.upload_fileobj(
             io.BytesIO(file_content),
             settings.AWS_S3_BUCKET_NAME,
@@ -95,18 +123,19 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[
         return None, 0
 
     finally:
+        # Reset file pointer for possible reuse
         await file.seek(0)
 
 
 async def delete_file_from_s3(s3_key: str) -> bool:
     """
-    S3에서 파일 삭제
+    Delete a file from S3.
 
     Args:
-        s3_key: 삭제할 파일의 S3 키
+        s3_key: S3 key of the file to be deleted
 
     Returns:
-        bool: 삭제 성공 여부
+        bool: True if deleted successfully, False otherwise
     """
     try:
         s3_client = await s3_service.get_s3_client()
@@ -131,19 +160,19 @@ async def delete_file_from_s3(s3_key: str) -> bool:
 
 async def get_file_url_from_s3(s3_key: str, expires_in: int = 3600) -> Optional[str]:
     """
-    S3 파일의 임시 URL 생성
+    Generate a temporary pre-signed URL for an S3 file.
 
     Args:
-        s3_key: 파일의 S3 키
-        expires_in: URL 만료 시간(초), 기본값 1시간
+        s3_key: S3 key of the file
+        expires_in: Expiration time of the URL in seconds (default: 1 hour)
 
     Returns:
-        Optional[str]: 임시 URL 또는 None if 실패
+        Optional[str]: Temporary URL or None if failed
     """
     try:
         s3_client = await s3_service.get_s3_client()
 
-        url = await s3_client.generate_presigned_url(
+        url = s3_client.generate_presigned_url(
             'get_object',
             Params={
                 'Bucket': settings.AWS_S3_BUCKET_NAME,
@@ -165,13 +194,13 @@ async def get_file_url_from_s3(s3_key: str, expires_in: int = 3600) -> Optional[
         return None
 
 
-# FastAPI 앱에서 사용할 라이프사이클 이벤트
+# Lifecycle events for FastAPI app
 async def init_s3_service():
-    """S3 서비스 초기화"""
+    """Initialize S3 service"""
     logger.info("[S3 Service] Initializing...")
 
 
 async def close_s3_service():
-    """S3 서비스 종료"""
+    """Shutdown S3 service and close connections"""
     logger.info("[S3 Service] Closing connections...")
     await s3_service.close()
