@@ -9,10 +9,7 @@ router = APIRouter(tags=["music"])
 
 
 class GenerateMusicRequest(BaseModel):
-    """
-    Request schema for music generation.
-    For now, just an image path (later could be an uploaded file or S3 key).
-    """
+    """Request schema for music generation."""
     image_path: str
 
 
@@ -29,23 +26,24 @@ class GenerateMusicResponse(BaseModel):
 )
 async def generate_music_api(body: GenerateMusicRequest):
     """
-    Orchestrator API for background music generation.
+    API endpoint for background music generation.
 
     Steps:
     1. Extract emotion from image (dummy for now)
-    2. Generate music using MusicGen (GPU, lock protected)
-    3. Upload to S3 and return the key
+    2. Generate music with MusicGen (GPU, lock protected)
+    3. Upload to S3
+    4. Return s3_key and presigned URL
     """
     try:
-        s3_key = await generate_music_pipeline(body.image_path, duration=10)
+        result = await generate_music_pipeline(body.image_path, duration=10)
 
-        if not s3_key:
+        if not result or not result.get("s3_key"):
             raise GenerationError("Pipeline did not return a valid s3_key")
 
         return GenerateMusicResponse(
             status="success",
             message="Music generated successfully",
-            data={"s3_key": s3_key},
+            data=result,   # contains both s3_key and url
         )
 
     except AIServerError:
