@@ -3,14 +3,26 @@ from pydantic import Field
 
 
 class Settings(BaseSettings):
-    # Environment
-    APP_ENV: str = Field("production", description="Application environment (e.g., production, development)")
-    LOG_LEVEL: str = Field("INFO", description="Log level (DEBUG, INFO, WARNING, ERROR)")
+    """
+    Application settings loaded from environment variables or .env file.
+
+    """
+
+    # ── Application settings ──────────────────────────────
+    APP_ENV: str = Field(
+        "production",
+        description="Application environment (e.g., production, development)"
+    )
+    LOG_LEVEL: str = Field(
+        "INFO",
+        description="Log level (DEBUG, INFO, WARNING, ERROR)"
+    )
     DISCORD_WEBHOOK_URL: str | None = Field(
         None,
         description="Discord Webhook URL for error alerts (optional)"
     )
 
+    # ── AWS credentials and config ────────────────────────
     AWS_ACCESS_KEY_ID: str = Field(
         ..., min_length=16, max_length=128, description="AWS Access Key ID"
     )
@@ -25,6 +37,11 @@ class Settings(BaseSettings):
     )
 
     class Config:
+        """
+        Pydantic config:
+        - env_file: Load values from .env file
+        - extra: Forbid any unknown environment variables
+        """
         env_file = ".env"
         extra = "forbid"
 

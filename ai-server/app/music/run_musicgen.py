@@ -3,8 +3,8 @@ import tempfile
 import torch
 import torchaudio
 
-from app.core.exceptions import GenerationError
-from app.core.s3 import upload_file_to_s3
+from app.utils.exceptions import GenerationError
+from app.utils.s3 import upload_file_to_s3
 from app.music.model import model, model_lock, SAMPLE_RATE
 
 def _build_prompt_from_emotion(emotion: str) -> str:
