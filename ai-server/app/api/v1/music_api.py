@@ -10,13 +10,20 @@ from app.music.run_musicgen import generate_music
 
 router = APIRouter(tags=["music"])
 
+
 class GenerateMusicRequest(BaseModel):
+    """
+    Request schema for music generation.
+    - emotion: EmotionEnum
+    """
     emotion: EmotionEnum
+
 
 class GenerateMusicResponse(BaseModel):
     status: str
     message: str
     data: Dict[str, str]
+
 
 @router.post(
     "/generate-music",
@@ -25,10 +32,17 @@ class GenerateMusicResponse(BaseModel):
 )
 async def generate_music_api(body: GenerateMusicRequest):
     """
-    배경음 생성을 위한 API (감정 기반)
-    - 입력: emotion (Enum)
-    - 처리: MusicGen 호출 (동기 함수는 threadpool로 실행)
-    - 출력: 생성된 오디오의 S3 키
+    Background music generation API (emotion-based).
+    Steps:
+    1. Receive an emotion (Enum) as input
+    2. Call MusicGen synchronously inside a threadpool
+    3. Return the S3 key of the generated audio file
+
+    Args:
+        body (GenerateMusicRequest): Request body with emotion enum
+
+    Returns:
+        GenerateMusicResponse: API response containing the S3 key
     """
     emotion_value = body.emotion.value.lower()
 

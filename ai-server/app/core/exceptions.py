@@ -1,5 +1,12 @@
 class AIServerError(Exception):
-    """모든 AI 서버 관련 예외의 기본 클래스"""
+    """
+    Base class for all AI server related exceptions.
+
+    Attributes:
+        status_code (int): HTTP status code returned to the client
+        error_code (str): Application-specific error identifier
+        message (str): Human-readable error message
+    """
     status_code = 500
     error_code = "AI_SERVER_ERROR"
 
@@ -9,7 +16,9 @@ class AIServerError(Exception):
 
 
 class GenerationError(AIServerError):
-    """음악 생성 실패"""
+    """
+    Exception raised when music generation fails.
+    """
     status_code = 500
     error_code = "MUSIC_GENERATION_FAILED"
 
@@ -18,7 +27,9 @@ class GenerationError(AIServerError):
 
 
 class S3UploadError(AIServerError):
-    """S3 업로드 실패"""
+    """
+    Exception raised when uploading a file to S3 fails.
+    """
     status_code = 502
     error_code = "S3_UPLOAD_FAILED"
 
@@ -27,7 +38,10 @@ class S3UploadError(AIServerError):
 
 
 class InvalidPromptError(AIServerError):
-    """프롬프트가 비정상적인 경우"""
+    """
+    Exception raised when the provided prompt is invalid
+    for music generation.
+    """
     status_code = 400
     error_code = "INVALID_PROMPT"
 
