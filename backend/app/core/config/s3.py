@@ -7,6 +7,7 @@ import aioboto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config.settings import settings
 from app.core.logging.logger import get_logger
@@ -202,3 +203,32 @@ async def close_s3_service():
     """Shutdown S3 service and close connections"""
     logger.info("[S3 Service] Closing connections...")
     await s3_service.close()
+
+# --------------------
+# Presigned URL
+# --------------------
+
+async def generate_presigned_url(s3_key: str, expires_in: int = 3600) -> Optional[str]:
+    """Generate a presigned URL for GET request."""
+    try:
+        s3_client = await s3_service.get_s3_client()
+
+        if asyncio.iscoroutinefunction(s3_client.generate_presigned_url):
+            url = await s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": settings.AWS_S3_BUCKET_NAME, "Key": s3_key},
+                ExpiresIn=expires_in,
+            )
+        else:
+            url = await run_in_threadpool(
+                s3_client.generate_presigned_url,
+                "get_object",
+                Params={"Bucket": settings.AWS_S3_BUCKET_NAME, "Key": s3_key},
+                ExpiresIn=expires_in,
+            )
+
+        logger.info(f"[S3 Presigned URL] Generated: key={s3_key}, expires_in={expires_in}")
+        return url
+    except Exception as e:
+        logger.exception(f"[S3 Presigned URL] Failed: {e}")
+        return None

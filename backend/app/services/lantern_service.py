@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from fastapi import UploadFile
 
-from app.core.config.s3 import upload_file_to_s3
+from app.core.config.s3 import upload_file_to_s3, generate_presigned_url
 from app.core.exceptions.types import FileSaveError, NotFoundError, ForbiddenError, ValidationError
 from app.core.tasks.music_tasks import process_lantern_music
 from app.repositories.lantern_repository import LanternRepository
@@ -63,7 +63,7 @@ class LanternService:
             path, orig, ext, size = await self._upload_image_to_s3(img)
             uploaded_images.append(
                 ImageInfo(
-                    s3_path=path,
+                    s3_key=path,
                     original_filename=orig,
                     file_extension=ext,
                     file_size=size
@@ -76,13 +76,13 @@ class LanternService:
         for info in uploaded_images:
             task = process_lantern_music.delay(
                 lantern_id,
-                info.s3_path,
+                info.s3_key,
             )
             task_ids.append(task.id)
 
             music_statuses.append(
                 MusicStatusInfo(
-                    image_s3=info.s3_path,
+                    image_s3=info.s3_key,
                     task_id=task.id,
                     status="pending",
                     s3_key=None
@@ -146,30 +146,33 @@ class LanternService:
                 error_code="LANTERN_NOT_FOUND"
             )
 
-        if not lantern.get("is_public", False):
-            logger.warning(f"[LanternService] Access denied for private lantern: {lantern_id}")
-            raise ForbiddenError(
-                message="This lantern is private.",
-                error_code="LANTERN_NOT_PUBLIC"
-            )
+        # presigned URL 변환
+        images = []
+        for image in lantern.get("images", []):
+            s3_key = image.get("s3_key")
+            if s3_key:
+                url = await generate_presigned_url(s3_key)
+                if url:
+                    images.append(url)
 
-        image_paths = [
-            image["s3_path"] for image in lantern.get("images", []) if "s3_path" in image
-        ]
-        background_sounds = [
-            music["s3_path"] for music in lantern.get("musics", []) if "s3_path" in music
-        ]
+        musics = []
+        for music in lantern.get("musics", []):
+            s3_key = music.get("s3_key")
+            if s3_key:
+                url = await generate_presigned_url(s3_key)
+                if url:
+                    musics.append(url)
 
         logger.info(
             f"[LanternService] Lantern detail fetched: lantern_id={lantern_id}, "
-            f"images={len(image_paths)}, musics={len(background_sounds)}"
+            f"images={len(images)}, musics={len(musics)}"
         )
 
         return LanternDetailResponseModel(
             lantern_id=lantern["lantern_id"],
             owner_name=lantern["user_name"],
-            images=image_paths,
-            background_sounds=background_sounds
+            images=images,
+            background_sounds=musics
         )
 
     """
