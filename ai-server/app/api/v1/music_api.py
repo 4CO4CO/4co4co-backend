@@ -43,7 +43,7 @@ async def generate_music_api(body: GenerateMusicRequest):
         return GenerateMusicResponse(
             status="success",
             message="Music generated successfully",
-            data=result,   # contains both s3_key and url
+            data=result,
         )
 
     except AIServerError:

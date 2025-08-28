@@ -99,3 +99,28 @@ class LanternRepository:
             return [doc async for doc in cursor]
         except Exception as e:
             raise DatabaseError(f"Database query failed: {e}") from e
+
+
+    async def update_music_task(self, lantern_id: str, image_key: str, task_id: str) -> bool:
+        """
+        Update the task_id for a given image in the music_statuses array.
+        Args:
+            lantern_id (str): Lantern identifier
+            image_key (str): Image S3 key to match inside music_statuses
+            task_id (str): Celery task ID to set
+        Returns:
+            bool: True if a document was modified, False otherwise
+        Raises:
+            DatabaseError: if query fails
+        """
+        try:
+            result = await self.collection.update_one(
+                {"lantern_id": lantern_id, "music_statuses.image_s3": image_key},
+                {"$set": {"music_statuses.$.task_id": task_id}}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            raise DatabaseError(
+                f"update_music_task failed for lantern_id={lantern_id}, image_key={image_key}: {e}"
+            ) from e
+

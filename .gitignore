@@ -9,6 +9,7 @@
 **/.env
 **/.env.*
 **/k8s
+**/model/
 
 # logging files
 **/logs/
