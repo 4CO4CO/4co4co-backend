@@ -19,7 +19,7 @@ class ImageInfo(BaseModel):
     """
     Metadata about an uploaded image.
     """
-    s3_path: str
+    s3_key: str
     original_filename: Optional[str]
     file_extension: Optional[str]
     file_size: Optional[int]

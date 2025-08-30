@@ -71,37 +71,41 @@ class LanternService:
             )
             logger.info(f"[LanternService] Image uploaded to S3: {path}, size={size} bytes")
 
-        task_ids: List[str] = []
-        music_statuses: List[MusicStatusInfo] = []
-        for info in uploaded_images:
-            task = process_lantern_music.delay(
-                lantern_id,
-                info.s3_key,
+        music_statuses: List[MusicStatusInfo] = [
+            MusicStatusInfo(
+                image_s3=info.s3_key,
+                task_id="",
+                status="pending",
+                s3_key=None
             )
-            task_ids.append(task.id)
-
-            music_statuses.append(
-                MusicStatusInfo(
-                    image_s3=info.s3_key,
-                    task_id=task.id,
-                    status="pending",
-                    s3_key=None
-                )
-            )
-            logger.info(f"[LanternService] Music task queued: task_id={task.id}, image_s3={info.s3_path}")
+            for info in uploaded_images
+        ]
 
         lantern_doc = LanternDBModel(
             lantern_id=lantern_id,
             user_name=name,
             images=uploaded_images,
             musics=[],
-            music_tasks=task_ids,
+            music_tasks=[],
             music_statuses=music_statuses,
             is_public=is_public,
             created_at=datetime.utcnow()
         )
         await self.lantern_repo.insert_lantern(lantern_doc.model_dump(exclude={'id'}))
         logger.info(f"[LanternService] Lantern created successfully: lantern_id={lantern_id}")
+
+        # 이제 task를 큐에 넣음 (insert 이후)
+        task_ids: List[str] = []
+        for info in uploaded_images:
+            task = process_lantern_music.delay(lantern_id, info.s3_key)
+            task_ids.append(task.id)
+
+            # task_id 업데이트
+            await self.lantern_repo.update_music_task(
+                lantern_id, info.s3_key, task.id
+            )
+
+            logger.info(f"[LanternService] Music task queued: task_id={task.id}, image_s3={info.s3_key}")
 
         return lantern_id
 

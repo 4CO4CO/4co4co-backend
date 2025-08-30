@@ -1,5 +1,8 @@
 import asyncio
 import io
+import tempfile
+from pathlib import Path
+
 import soundfile as sf
 from PIL import Image
 from typing import Optional, Tuple
@@ -133,13 +136,19 @@ async def delete_file_from_s3(s3_key: str) -> bool:
 # File Download
 # --------------------
 
-async def download_image_from_s3(s3_key: str) -> Image.Image:
-    """Download an image from S3 and return it as a PIL Image."""
+async def download_image_from_s3(s3_key: str) -> str:
+    """Download an image from S3, save locally, and return file path."""
     try:
         s3_client = await s3_service.get_s3_client()
         obj = await s3_client.get_object(Bucket=settings.AWS_S3_BUCKET_NAME, Key=s3_key)
         body = await obj["Body"].read()
-        return Image.open(io.BytesIO(body)).convert("RGB")
+
+        # 임시 파일 생성
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=Path(s3_key).suffix)
+        img = Image.open(io.BytesIO(body)).convert("RGB")
+        img.save(tmp_file.name)
+
+        return tmp_file.name   # str 경로 반환
     except Exception as e:
         logger.exception(f"[S3 Download] Failed: key={s3_key}, error={e}")
         raise

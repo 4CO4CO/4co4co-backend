@@ -11,20 +11,17 @@ from app.core.logging.logger import get_logger
 logger = get_logger(__name__)
 
 
-def call_ai_server(
-    image: str,
-) -> str:
+def call_ai_server(image: str) -> str:
     """
     Call the AI server with a single image key to generate music.
-    - Sends a POST request with {"image": image}
+    - Sends a POST request with {"image_path": image}
     - Returns the generated s3_key on success
-    - Raises AppError on failure (request error or invalid response)
     """
     url = f"{settings.AI_SERVER_URL}{settings.API_PREFIX}/generate-music"
-    payload = {"image": image}
+    payload = {"image_path": image}  # <-- 수정된 부분
 
     try:
-        logger.info(f"[AI Server] Request: url={url}, image={image}")
+        logger.info(f"[AI Server] Request: url={url}, payload={payload}")
         resp = httpx.post(url, json=payload, timeout=1000.0)
         resp.raise_for_status()
         body = resp.json()
