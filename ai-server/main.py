@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.v1.music_api import router as music_router
+from app.api.v1.generation import router as music_router
 from app.emotion.main_library import model_load, _load_musicgen_model
 from app.utils.exception_handlers import ai_server_error_handler
 from app.utils.exceptions import AIServerError
