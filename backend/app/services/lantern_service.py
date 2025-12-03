@@ -1,12 +1,14 @@
+import json
+import asyncio
+import time
 import random
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Tuple, Optional
 
-from fastapi import UploadFile
-
+from fastapi import UploadFile, Request
+from app.core.config.settings import settings
 from app.core.config.s3 import upload_file_to_s3, generate_presigned_url
-from app.core.exceptions.types import FileSaveError, NotFoundError, ForbiddenError, ValidationError
-from app.core.tasks.music_tasks import process_lantern_music
+from app.core.exceptions.types import FileSaveError, NotFoundError, ValidationError
 from app.repositories.lantern_repository import LanternRepository
 from app.schemas.db.lantern import LanternDBModel, ImageInfo, MusicStatusInfo
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
@@ -17,47 +19,39 @@ logger = get_logger(__name__)
 
 
 def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
-    """
-    Convert a lantern document from DB into a LanternResponseModel.
-    Used for list responses (lightweight).
-    """
+    """Helper to convert DB doc to ResponseModel"""
     return LanternResponseModel(
         lantern_id=doc["lantern_id"],
         owner_name=doc["user_name"],
-        is_current_lantern=(doc["lantern_id"] == current_lantern_id)
+        is_current_lantern=(doc["lantern_id"] == current_lantern_id),
     )
 
 
 class LanternService:
-    """
-    Service layer for lantern-related operations.
-    Handles creation, retrieval, and detail fetching of lanterns.
-    """
-
     def __init__(self, db):
         self.lantern_repo = LanternRepository(db)
 
-    """
-    Create a new lantern
-    """
-    async def create_lanterns(
+    # -------------------------------
+    # Create (Metadata Only)
+    # -------------------------------
+    async def create_lantern_metadata(
             self,
             name: str,
             images: List[UploadFile],
-            is_public: bool = True
-    ) -> str:
-        logger.info(f"[LanternService] Creating lantern for user={name}, is_public={is_public}")
+            is_public: bool = True,
+    ) -> Tuple[str, List[ImageInfo]]:
+        """
+        1. Generate unique ID
+        2. Upload images to S3
+        3. Save metadata to DB with 'pending' status
+        4. Return lantern_id and image info for Task triggering
+        """
+        logger.info(f"[LanternService] Creating metadata for user={name}")
 
-        MAX_RETRY = 5
-        for _ in range(MAX_RETRY):
-            code = str(random.randint(1000, 9999))
-            lantern_id = f"{name}-{code}"
-            if not await self.lantern_repo.exists_by_lantern_id(lantern_id):
-                break
-        else:
-            logger.error(f"[LanternService] Failed to create unique lantern_id for user={name}")
-            raise ValidationError("Duplicate lantern ID")
+        # 1. Generate unique lantern_id
+        lantern_id = await self._generate_unique_id(name)
 
+        # 2. Upload images to S3
         uploaded_images: List[ImageInfo] = []
         for img in images:
             path, orig, ext, size = await self._upload_image_to_s3(img)
@@ -66,21 +60,22 @@ class LanternService:
                     s3_key=path,
                     original_filename=orig,
                     file_extension=ext,
-                    file_size=size
+                    file_size=size,
                 )
             )
-            logger.info(f"[LanternService] Image uploaded to S3: {path}, size={size} bytes")
 
+        # 3. Init music status (Pending)
         music_statuses: List[MusicStatusInfo] = [
             MusicStatusInfo(
                 image_s3=info.s3_key,
                 task_id="",
                 status="pending",
-                s3_key=None
+                s3_key=None,
             )
             for info in uploaded_images
         ]
 
+        # 4. Insert lantern doc
         lantern_doc = LanternDBModel(
             lantern_id=lantern_id,
             user_name=name,
@@ -89,110 +84,160 @@ class LanternService:
             music_tasks=[],
             music_statuses=music_statuses,
             is_public=is_public,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
-        await self.lantern_repo.insert_lantern(lantern_doc.model_dump(exclude={'id'}))
-        logger.info(f"[LanternService] Lantern created successfully: lantern_id={lantern_id}")
 
-        # 이제 task를 큐에 넣음 (insert 이후)
-        task_ids: List[str] = []
-        for info in uploaded_images:
-            task = process_lantern_music.delay(lantern_id, info.s3_key)
-            task_ids.append(task.id)
+        await self.lantern_repo.insert_lantern(
+            lantern_doc.model_dump(exclude={"id"})
+        )
 
-            # task_id 업데이트
-            await self.lantern_repo.update_music_task(
-                lantern_id, info.s3_key, task.id
-            )
+        logger.info(f"[LanternService] Metadata saved: {lantern_id}")
+        return lantern_id, uploaded_images
 
-            logger.info(f"[LanternService] Music task queued: task_id={task.id}, image_s3={info.s3_key}")
+    # -------------------------------
+    # SSE Logic
+    # -------------------------------
+    async def subscribe_music_status(
+            self, request: Request, lantern_id: str, resume: bool, last_event_id: str = None
+    ):
+        """
+        Async Generator for SSE.
+        Monitors DB for status changes (pending -> success/failed).
+        """
+        start_time = time.time()
+        sent_keys = set()
 
-        return lantern_id
+        # Validation
+        doc = await self.get_lantern_detail_raw(lantern_id)
+        if not doc:
+            yield {"event": "error", "data": json.dumps({"error": "Lantern not found"})}
+            return
 
-    """
-    Fetch recent lanterns (combination of current lantern + random recommendations)
-    """
-    async def get_recent_lanterns(self, current_lantern_id: Optional[str] = None, limit: int = 20):
-        logger.info(f"[LanternService] Fetching recent lanterns, current_lantern_id={current_lantern_id}, limit={limit}")
+        polling_interval = getattr(settings, "SSE_POLLING_INTERVAL", 3)
+        timeout = getattr(settings, "SSE_TIMEOUT", 60)
+
+        while True:
+            try:
+                # 1. Check Disconnect
+                if await request.is_disconnected():
+                    logger.info(f"[SSE] Client disconnected: {lantern_id}")
+                    break
+
+                # 2. Check Timeout
+                if time.time() - start_time > timeout:
+                    logger.info(f"[SSE] Timeout: {lantern_id}")
+                    break
+
+                # 3. Fetch Status
+                doc = await self.lantern_repo.find_by_lantern_id(lantern_id)
+                if not doc:
+                    yield {"event": "error", "data": json.dumps({"error": "Lantern deleted"})}
+                    break
+
+                statuses = doc.get("music_statuses", [])
+
+                # 4. Send Completed (Partial)
+                for s in statuses:
+                    # Using image_s3 as unique key for dedup
+                    if s["status"] == "success" and s["image_s3"] not in sent_keys:
+                        yield {
+                            "event": "music_done_partial",
+                            "data": json.dumps(s, default=str)
+                        }
+                        sent_keys.add(s["image_s3"])
+
+                    elif s["status"] == "failed" and s["image_s3"] not in sent_keys:
+                        yield {
+                            "event": "music_failed",
+                            "data": json.dumps(s, default=str)
+                        }
+                        sent_keys.add(s["image_s3"])
+
+                # 5. Check All Done
+                if all(s["status"] in ["success", "failed"] for s in statuses) and statuses:
+                    yield {
+                        "event": "music_done_all",
+                        "data": json.dumps(statuses, default=str)
+                    }
+                    break
+
+            except Exception as e:
+                logger.error(f"[SSE] Loop Error: {e}")
+                yield {"event": "error", "data": json.dumps({"error": str(e)})}
+                break
+
+            await asyncio.sleep(polling_interval)
+
+    # -------------------------------
+    # Read Operations
+    # -------------------------------
+    async def get_recent_lanterns(
+            self, current_lantern_id: Optional[str] = None, limit: int = 20
+    ):
         current_doc = None
-
         if current_lantern_id:
-            current_doc = await self.lantern_repo.find_by_lantern_id(current_lantern_id)
-            if not current_doc:
-                logger.warning(f"[LanternService] Lantern not found: {current_lantern_id}")
-                raise NotFoundError(
-                    message=f"Lantern ID {current_lantern_id} not found.",
-                    error_code="LANTERN_NOT_FOUND"
-                )
+            current_doc = await self.get_lantern_detail_raw(current_lantern_id)
             limit -= 1
-            logger.info(f"[LanternService] Current lantern found: {current_lantern_id}")
 
         other_docs = await self.lantern_repo.find_random_lanterns(
-            exclude_lantern_id=current_lantern_id if current_doc else None,
-            limit=limit
+            exclude_lantern_id=current_lantern_id if current_doc else None, limit=limit
         )
-        logger.info(f"[LanternService] Retrieved {len(other_docs)} random lanterns")
 
         docs = [current_doc] + other_docs if current_doc else other_docs
-        return [to_lantern_model(doc, current_lantern_id) for doc in docs]
+        return [to_lantern_model(doc, current_lantern_id) for doc in docs if doc]
 
-    """
-    Fetch detailed information about a specific lantern
-    """
     async def get_lantern_detail(self, lantern_id: str):
-        logger.info(f"[LanternService] Fetching detail for lantern_id={lantern_id}")
+        """Fetch detail with presigned URLs"""
+        lantern = await self.get_lantern_detail_raw(lantern_id)
 
-        lantern = await self.lantern_repo.find_by_lantern_id(lantern_id)
-        if not lantern:
-            logger.warning(f"[LanternService] Lantern not found: {lantern_id}")
-            raise NotFoundError(
-                message=f"Lantern ID {lantern_id} not found.",
-                error_code="LANTERN_NOT_FOUND"
-            )
-
-        # presigned URL 변환
+        # Convert to Presigned URLs
         images = []
         for image in lantern.get("images", []):
             s3_key = image.get("s3_key")
             if s3_key:
                 url = await generate_presigned_url(s3_key)
-                if url:
-                    images.append(url)
+                if url: images.append(url)
 
         musics = []
         for music in lantern.get("musics", []):
-            s3_key = music.get("s3_key")
-            if s3_key:
-                url = await generate_presigned_url(s3_key)
-                if url:
-                    musics.append(url)
-
-        logger.info(
-            f"[LanternService] Lantern detail fetched: lantern_id={lantern_id}, "
-            f"images={len(images)}, musics={len(musics)}"
-        )
+            s3_path = music.get("s3_path")
+            if s3_path:
+                url = await generate_presigned_url(s3_path)
+                if url: musics.append(url)
 
         return LanternDetailResponseModel(
             lantern_id=lantern["lantern_id"],
             owner_name=lantern["user_name"],
             images=images,
-            background_sounds=musics
+            background_sounds=musics,
         )
 
-    """
-    Upload an image to S3 and return file metadata
-    """
-    @staticmethod
-    async def _upload_image_to_s3(image):
-        original_filename = image.filename
-        file_extension = original_filename.split('.')[-1]
+    async def get_lantern_detail_raw(self, lantern_id: str) -> dict:
+        lantern = await self.lantern_repo.find_by_lantern_id(lantern_id)
+        if not lantern:
+            raise NotFoundError(message=f"Lantern ID {lantern_id} not found.")
+        return lantern
 
+    # -------------------------------
+    # Helpers
+    # -------------------------------
+    async def _generate_unique_id(self, name: str) -> str:
+        for _ in range(5):
+            code = str(random.randint(1000, 9999))
+            lantern_id = f"{name}-{code}"
+            if not await self.lantern_repo.exists_by_lantern_id(lantern_id):
+                return lantern_id
+        raise ValidationError("Duplicate lantern ID")
+
+    @staticmethod
+    async def _upload_image_to_s3(image: UploadFile):
+        original_filename = image.filename
+        file_extension = original_filename.split(".")[-1]
         try:
             s3_key, file_size = await upload_file_to_s3(image, folder="lanterns")
             if s3_key is None:
                 raise FileSaveError("S3 upload failed")
             return s3_key, original_filename, file_extension, file_size
-
         except Exception as e:
-            logger.error(f"[LanternService] File upload failed: {original_filename}, error={e}", exc_info=True)
+            logger.error(f"File upload failed: {e}")
             raise FileSaveError(f"File upload failed: {e}") from e

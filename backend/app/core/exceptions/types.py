@@ -1,8 +1,6 @@
 class AppError(Exception):
     """
     Base class for all custom application exceptions.
-    - Provides a standard structure with status_code and error_code
-    - Can be extended for specific error types
     """
     status_code = 500
     error_code = "APP_ERROR"

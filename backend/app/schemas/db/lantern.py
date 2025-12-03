@@ -8,27 +8,27 @@ from pydantic import BaseModel, Field, ConfigDict, field_serializer
 class MusicStatusInfo(BaseModel):
     """
     Represents the processing status of music generation for a given image.
+    Used for tracking Celery task progress.
     """
     image_s3: str
     task_id: str
-    status: str
+    status: str  # 'pending', 'success', 'failed'
     s3_key: Optional[str] = None
+
+    error_msg: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
 
 class ImageInfo(BaseModel):
-    """
-    Metadata about an uploaded image.
-    """
+    """Metadata about an uploaded image."""
     s3_key: str
-    original_filename: Optional[str]
-    file_extension: Optional[str]
-    file_size: Optional[int]
+    original_filename: Optional[str] = None
+    file_extension: Optional[str] = None
+    file_size: Optional[int] = None
 
 
 class MusicInfo(BaseModel):
-    """
-    Metadata about a generated music file.
-    """
+    """Metadata about a generated music file."""
     s3_path: str
     created_at: datetime
 
@@ -36,9 +36,8 @@ class MusicInfo(BaseModel):
 class LanternDBModel(BaseModel):
     """
     Pydantic model representing a lantern document stored in MongoDB.
-    Includes metadata about images, music, and task statuses.
     """
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
 
     id: Optional[ObjectId] = Field(default=None, alias="_id")
     lantern_id: str
@@ -52,8 +51,4 @@ class LanternDBModel(BaseModel):
 
     @field_serializer('id')
     def serialize_objectid(self, id_value, _info):
-        """
-        Serialize MongoDB ObjectId to string when returning the model.
-        Prevents issues with JSON encoding of ObjectId.
-        """
-        return str(id_value)
+        return str(id_value) if id_value else None
