@@ -1,22 +1,23 @@
 import json
-import asyncio
-import time
 import random
 from datetime import datetime
 from typing import List, Tuple, Optional
 
+import redis.asyncio as redis
 from fastapi import UploadFile, Request
-from app.core.config.settings import settings
+
 from app.core.config.s3 import upload_file_to_s3, generate_presigned_url
+from app.core.config.settings import settings
 from app.core.exceptions.types import FileSaveError, NotFoundError, ValidationError
+from app.core.logging.logger import get_logger
 from app.repositories.lantern_repository import LanternRepository
 from app.schemas.db.lantern import LanternDBModel, ImageInfo, MusicStatusInfo
 from app.schemas.response.lantern_detail_response import LanternDetailResponseModel
 from app.schemas.response.lantern_response import LanternResponseModel
-from app.core.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
+redis_async_client = redis.from_url(settings.CELERY_BROKER_URL)
 
 def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
     """Helper to convert DB doc to ResponseModel"""
@@ -101,72 +102,71 @@ class LanternService:
             self, request: Request, lantern_id: str, resume: bool, last_event_id: str = None
     ):
         """
-        Async Generator for SSE.
-        Monitors DB for status changes (pending -> success/failed).
+        [Redis Pub/Sub 방식]
+        1. 먼저 DB를 한 번 조회해서 이미 완료된 게 있는지 확인 (새로고침 대비)
+        2. 그 후 Redis 채널을 구독하여 실시간 이벤트를 기다림
         """
-        start_time = time.time()
-        sent_keys = set()
 
-        # Validation
-        doc = await self.get_lantern_detail_raw(lantern_id)
+        # 이미 완료된 작업이 있는지 DB 조회
+        doc = await self.lantern_repo.find_by_lantern_id(lantern_id)
         if not doc:
             yield {"event": "error", "data": json.dumps({"error": "Lantern not found"})}
             return
 
-        polling_interval = getattr(settings, "SSE_POLLING_INTERVAL", 3)
-        timeout = getattr(settings, "SSE_TIMEOUT", 60)
+        # 이미 성공/실패한 작업들을 먼저 보내줌 (새로고침 시 빈 화면 방지)
+        statuses = doc.get("music_statuses", [])
+        completed_count = 0
+        for s in statuses:
+            if s["status"] in ["success", "failed"]:
+                completed_count += 1
+                yield {
+                    "event": "music_done_partial" if s["status"] == "success" else "music_failed",
+                    "data": json.dumps(s, default=str)
+                }
 
-        while True:
-            try:
-                # 1. Check Disconnect
+        # 모든 작업이 이미 끝났으면 Redis 연결할 필요 없이 종료
+        if completed_count == len(statuses) and statuses:
+            yield {"event": "music_done_all", "data": json.dumps(statuses, default=str)}
+            return
+
+        # 2. Redis Pub/Sub 시작
+        pubsub = redis_async_client.pubsub()
+        channel_name = f"lantern_status:{lantern_id}"
+        await pubsub.subscribe(channel_name)
+
+        logger.info(f"[SSE] Subscribed to Redis channel: {channel_name}")
+
+        try:
+            # Redis 메시지 루프
+            async for message in pubsub.listen():
                 if await request.is_disconnected():
                     logger.info(f"[SSE] Client disconnected: {lantern_id}")
                     break
 
-                # 2. Check Timeout
-                if time.time() - start_time > timeout:
-                    logger.info(f"[SSE] Timeout: {lantern_id}")
-                    break
+                if message["type"] == "message":
+                    raw_data = message["data"]
+                    payload = json.loads(raw_data)
 
-                # 3. Fetch Status
-                doc = await self.lantern_repo.find_by_lantern_id(lantern_id)
-                if not doc:
-                    yield {"event": "error", "data": json.dumps({"error": "Lantern deleted"})}
-                    break
+                    status = payload["status"]
 
-                statuses = doc.get("music_statuses", [])
+                    # 이벤트 타입 결정
+                    event_type = "music_progress"  # processing, retrying
+                    if status == "success":
+                        event_type = "music_done_partial"
+                    elif status == "failed":
+                        event_type = "music_failed"
 
-                # 4. Send Completed (Partial)
-                for s in statuses:
-                    # Using image_s3 as unique key for dedup
-                    if s["status"] == "success" and s["image_s3"] not in sent_keys:
-                        yield {
-                            "event": "music_done_partial",
-                            "data": json.dumps(s, default=str)
-                        }
-                        sent_keys.add(s["image_s3"])
-
-                    elif s["status"] == "failed" and s["image_s3"] not in sent_keys:
-                        yield {
-                            "event": "music_failed",
-                            "data": json.dumps(s, default=str)
-                        }
-                        sent_keys.add(s["image_s3"])
-
-                # 5. Check All Done
-                if all(s["status"] in ["success", "failed"] for s in statuses) and statuses:
                     yield {
-                        "event": "music_done_all",
-                        "data": json.dumps(statuses, default=str)
+                        "event": event_type,
+                        "data": raw_data  # 그대로 전송
                     }
-                    break
 
-            except Exception as e:
-                logger.error(f"[SSE] Loop Error: {e}")
-                yield {"event": "error", "data": json.dumps({"error": str(e)})}
-                break
-
-            await asyncio.sleep(polling_interval)
+        except Exception as e:
+            logger.error(f"[SSE] PubSub Error: {e}")
+            yield {"event": "error", "data": json.dumps({"error": str(e)})}
+        finally:
+            await pubsub.unsubscribe(channel_name)
+            await pubsub.close()
 
     # -------------------------------
     # Read Operations

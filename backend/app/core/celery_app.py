@@ -19,4 +19,8 @@ celery_app.conf.update(
     enable_utc=True,
     task_acks_late=True,          # 작업 완료 후 ACK 전송
     worker_prefetch_multiplier=1, # 한 번에 하나의 작업만 가져옴 (AI 작업 부하 분산)
+
+    broker_transport_options={
+        'visibility_timeout': 600  # 10분
+    }
 )
