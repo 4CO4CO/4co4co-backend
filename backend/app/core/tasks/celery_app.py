@@ -1,14 +1,13 @@
 from celery import Celery
 from app.core.config.settings import settings
 
-# Create a Celery application instance
 celery_app = Celery(
     "backend",
     broker=settings.RABBITMQ_URL,
     include=["app.core.tasks.music_tasks"],
 )
 
-# Update Celery configuration
+# configuration
 celery_app.conf.update(
     task_default_queue='celery',
     task_serializer='json',

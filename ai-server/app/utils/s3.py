@@ -21,21 +21,14 @@ logger = get_logger(__name__)
 
 
 class S3Service:
-    """
-    Lazy singleton-style S3 client manager.
-    - First call: opens aioboto3 client context (__aenter__)
-    - Subsequent calls: reuse the same client
-    - Close: properly calls __aexit__ to release the connection pool
-    """
 
     def __init__(self):
         self.session = aioboto3.Session()
-        self._s3_client = None          # actual client object
-        self._client_cm = None          # context manager
-        self._lock = asyncio.Lock()     # concurrency control
+        self._s3_client = None
+        self._client_cm = None
+        self._lock = asyncio.Lock()
 
     async def get_s3_client(self):
-        """Returns an initialized S3 client (singleton)."""
         if self._s3_client:
             return self._s3_client
 
@@ -54,7 +47,6 @@ class S3Service:
         return self._s3_client
 
     async def close(self):
-        """Close the S3 client properly."""
         if self._client_cm:
             await self._client_cm.__aexit__(None, None, None)
             self._client_cm = None
@@ -62,21 +54,13 @@ class S3Service:
             logger.info("[S3Service] S3 client closed")
 
 
-# Global S3 service instance
 s3_service = S3Service()
 
 
-# --------------------
-# File Upload / Delete
-# --------------------
-
 async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[Optional[str], int]:
-    """Upload a file to S3 asynchronously using streaming (memory efficient)."""
     try:
-        # 항상 처음부터 읽히도록 보장
         file.file.seek(0, io.SEEK_SET)
 
-        # 파일 사이즈 계산
         try:
             file_obj = file.file
             pos = file_obj.tell()
@@ -87,12 +71,10 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[
             file_size = 0
             logger.warning(f"[S3 Upload] Failed to calculate file size: {file.filename}")
 
-        # S3 key 생성
         safe_folder = (folder or "uploads").strip("/")
         ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else ""
         s3_key = f"{safe_folder}/{uuid4()}{('.' + ext) if ext else ''}"
 
-        # 업로드 실행
         s3_client = await s3_service.get_s3_client()
         await s3_client.upload_fileobj(
             file.file,
@@ -121,7 +103,6 @@ async def upload_file_to_s3(file: UploadFile, folder: str = "uploads") -> Tuple[
 
 
 async def delete_file_from_s3(s3_key: str) -> bool:
-    """Delete a file from S3."""
     try:
         s3_client = await s3_service.get_s3_client()
         await s3_client.delete_object(Bucket=settings.AWS_S3_BUCKET_NAME, Key=s3_key)
@@ -132,30 +113,24 @@ async def delete_file_from_s3(s3_key: str) -> bool:
         return False
 
 
-# --------------------
-# File Download
-# --------------------
-
 async def download_image_from_s3(s3_key: str) -> str:
-    """Download an image from S3, save locally, and return file path."""
     try:
         s3_client = await s3_service.get_s3_client()
         obj = await s3_client.get_object(Bucket=settings.AWS_S3_BUCKET_NAME, Key=s3_key)
         body = await obj["Body"].read()
 
-        # 임시 파일 생성
         tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=Path(s3_key).suffix)
         img = Image.open(io.BytesIO(body)).convert("RGB")
         img.save(tmp_file.name)
 
-        return tmp_file.name   # str 경로 반환
+        return tmp_file.name
     except Exception as e:
         logger.exception(f"[S3 Download] Failed: key={s3_key}, error={e}")
         raise
 
 
 async def upload_audio(audio_tensor, sample_rate: int, folder: str = "audios") -> str:
-    """Upload generated audio to S3 as WAV and return the S3 key."""
+
     try:
         audio_np = audio_tensor.squeeze().cpu().numpy() if hasattr(audio_tensor, "cpu") else audio_tensor
         buf = io.BytesIO()
@@ -177,12 +152,8 @@ async def upload_audio(audio_tensor, sample_rate: int, folder: str = "audios") -
         raise
 
 
-# --------------------
-# Presigned URL
-# --------------------
-
 async def generate_presigned_url(s3_key: str, expires_in: int = 3600) -> Optional[str]:
-    """Generate a presigned URL for GET request."""
+
     try:
         s3_client = await s3_service.get_s3_client()
 

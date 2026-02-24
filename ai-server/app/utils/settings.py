@@ -3,10 +3,6 @@ from pydantic import Field
 
 
 class Settings(BaseSettings):
-    """
-    Application settings loaded from environment variables or .env file.
-
-    """
 
     # ── Application settings ──────────────────────────────
     APP_ENV: str = Field(
@@ -37,11 +33,6 @@ class Settings(BaseSettings):
     )
 
     class Config:
-        """
-        Pydantic config:
-        - env_file: Load values from .env file
-        - extra: Forbid any unknown environment variables
-        """
         env_file = ".env"
         extra = "forbid"
 

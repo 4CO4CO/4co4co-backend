@@ -1,12 +1,5 @@
 class AIServerError(Exception):
-    """
-    Base class for all AI server related exceptions.
 
-    Attributes:
-        status_code (int): HTTP status code returned to the client
-        error_code (str): Application-specific error identifier
-        message (str): Human-readable error message
-    """
     status_code = 500
     error_code = "AI_SERVER_ERROR"
 
@@ -16,9 +9,7 @@ class AIServerError(Exception):
 
 
 class GenerationError(AIServerError):
-    """
-    Exception raised when music generation fails.
-    """
+
     status_code = 500
     error_code = "MUSIC_GENERATION_FAILED"
 

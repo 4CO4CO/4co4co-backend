@@ -17,10 +17,7 @@ logger = get_logger(__name__)
 
 
 def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternResponseModel:
-    """
-    Convert a lantern document from DB into a LanternResponseModel.
-    Used for list responses (lightweight).
-    """
+
     return LanternResponseModel(
         lantern_id=doc["lantern_id"],
         owner_name=doc["user_name"],
@@ -29,17 +26,10 @@ def to_lantern_model(doc: dict, current_lantern_id: Optional[str]) -> LanternRes
 
 
 class LanternService:
-    """
-    Service layer for lantern-related operations.
-    Handles creation, retrieval, and detail fetching of lanterns.
-    """
 
     def __init__(self, db):
         self.lantern_repo = LanternRepository(db)
 
-    """
-    Create a new lantern
-    """
     async def create_lanterns(
             self,
             name: str,
@@ -109,9 +99,6 @@ class LanternService:
 
         return lantern_id
 
-    """
-    Fetch recent lanterns (combination of current lantern + random recommendations)
-    """
     async def get_recent_lanterns(self, current_lantern_id: Optional[str] = None, limit: int = 20):
         logger.info(f"[LanternService] Fetching recent lanterns, current_lantern_id={current_lantern_id}, limit={limit}")
         current_doc = None
@@ -136,9 +123,6 @@ class LanternService:
         docs = [current_doc] + other_docs if current_doc else other_docs
         return [to_lantern_model(doc, current_lantern_id) for doc in docs]
 
-    """
-    Fetch detailed information about a specific lantern
-    """
     async def get_lantern_detail(self, lantern_id: str):
         logger.info(f"[LanternService] Fetching detail for lantern_id={lantern_id}")
 
@@ -179,9 +163,6 @@ class LanternService:
             background_sounds=musics
         )
 
-    """
-    Upload an image to S3 and return file metadata
-    """
     @staticmethod
     async def _upload_image_to_s3(image):
         original_filename = image.filename

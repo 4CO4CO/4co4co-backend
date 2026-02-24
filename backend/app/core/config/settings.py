@@ -3,10 +3,6 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """
-    Application configuration settings loaded from environment variables.
-    Uses Pydantic BaseSettings for automatic validation and parsing.
-    """
 
     # Environment
     APP_ENV: str = Field("production", description="Application environment (e.g., production, development)")
@@ -55,11 +51,8 @@ class Settings(BaseSettings):
     )
 
     class Config:
-        # Load environment variables from `.env` file
         env_file = ".env"
-        # Make environment variable names case-sensitive
         case_sensitive = True
 
 
-# Global settings instance
 settings = Settings()

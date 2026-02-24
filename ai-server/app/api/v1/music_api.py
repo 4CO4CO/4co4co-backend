@@ -9,7 +9,6 @@ router = APIRouter(tags=["music"])
 
 
 class GenerateMusicRequest(BaseModel):
-    """Request schema for music generation."""
     image_path: str
 
 
@@ -25,15 +24,7 @@ class GenerateMusicResponse(BaseModel):
     summary="Generate background music from an image",
 )
 async def generate_music_api(body: GenerateMusicRequest):
-    """
-    API endpoint for background music generation.
 
-    Steps:
-    1. Extract emotion from image (dummy for now)
-    2. Generate music with MusicGen (GPU, lock protected)
-    3. Upload to S3
-    4. Return s3_key and presigned URL
-    """
     try:
         result = await generate_music_pipeline(body.image_path, duration=10)
 

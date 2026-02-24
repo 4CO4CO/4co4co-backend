@@ -6,9 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_serializer
 
 
 class MusicStatusInfo(BaseModel):
-    """
-    Represents the processing status of music generation for a given image.
-    """
+
     image_s3: str
     task_id: str
     status: str
@@ -16,9 +14,7 @@ class MusicStatusInfo(BaseModel):
 
 
 class ImageInfo(BaseModel):
-    """
-    Metadata about an uploaded image.
-    """
+
     s3_key: str
     original_filename: Optional[str]
     file_extension: Optional[str]
@@ -26,18 +22,13 @@ class ImageInfo(BaseModel):
 
 
 class MusicInfo(BaseModel):
-    """
-    Metadata about a generated music file.
-    """
+
     s3_path: str
     created_at: datetime
 
 
 class LanternDBModel(BaseModel):
-    """
-    Pydantic model representing a lantern document stored in MongoDB.
-    Includes metadata about images, music, and task statuses.
-    """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: Optional[ObjectId] = Field(default=None, alias="_id")
@@ -52,8 +43,5 @@ class LanternDBModel(BaseModel):
 
     @field_serializer('id')
     def serialize_objectid(self, id_value, _info):
-        """
-        Serialize MongoDB ObjectId to string when returning the model.
-        Prevents issues with JSON encoding of ObjectId.
-        """
+
         return str(id_value)

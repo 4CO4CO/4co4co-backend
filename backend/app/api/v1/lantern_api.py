@@ -1,14 +1,14 @@
 import asyncio
 import json
 import time
-from typing import Optional, List
+from typing import Optional, List, Set, Dict, Any
 
 from fastapi import APIRouter, UploadFile, File, Form, Query, Path, Request, Header
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_client
-from app.core.exceptions.types import InvalidResumeEventError, NotFoundError
+from app.core.exceptions.types import NotFoundError
 from app.core.logging.logger import get_logger
 from app.core.response.response import success_response, success_no_cache_response
 from app.core.validation.lantern_validation import validate_name, validate_images
@@ -17,114 +17,119 @@ from app.schemas.response.lantern_detail_response import LanternDetailResponseMo
 from app.schemas.response.lantern_response import LanternResponseModel
 from app.schemas.response.schemas import ResponseModel
 from app.schemas.swagger import (
-    error_400, error_403, error_404, error_500,
-    error_400_lantern_examples, success_200_create_lantern,
-    success_200_music_status
+    error_400, error_404, error_500,
+    error_400_lantern_examples, success_200_create_lantern
 )
 from app.services.lantern_service import LanternService
 
 logger = get_logger(__name__)
-
 router = APIRouter()
 
 
-@router.get(
-    "/lanterns/{lantern_id}/music-status",
-    responses={
-        200: success_200_music_status,
-        400: {"description": "Invalid lantern_id format"},
-        404: {"description": "Lantern not found"},
-        500: {"description": "Internal server error"},
-    },
-)
+# --- Helper Functions for SSE ---
+
+def get_initial_sent_tasks(doc: Dict[str, Any], resume: bool, last_event_id: Optional[str]) -> Set[str]:
+    """
+    using last_event_id to preventing duplication
+    """
+    sent_task_ids = set()
+    if resume and last_event_id:
+        statuses = doc.get("music_statuses", [])
+        for s in statuses:
+            sent_task_ids.add(s["task_id"])
+            if s["task_id"] == last_event_id:
+                break
+    return sent_task_ids
+
+
+def get_new_status_updates(statuses: List[Dict[str, Any]], sent_task_ids: Set[str]) -> List[Dict[str, Any]]:
+    """
+    filtering pending status -> returns success & failed
+    """
+    return [
+        s for s in statuses
+        if s["status"] in ["success", "failed"] and s["task_id"] not in sent_task_ids
+    ]
+
+
+def format_sse_event(status_data: Dict[str, Any]) -> Dict[str, str]:
+    """
+    formating(DB -> SSE)
+    """
+    event_name = "music_done_partial" if status_data["status"] == "success" else "music_failed"
+    return {
+        "id": status_data["task_id"],
+        "event": event_name,
+        "data": json.dumps(status_data)
+    }
+
+
+# --- Router Endpoints ---
+
+@router.get("/lanterns/{lantern_id}/music-status")
 async def music_status(
-    request: Request,
-    lantern_id: str = Path(
-        ...,
-        description="조회할 랜턴의 ID",
-        regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
-    ),
-    resume: bool = Query(False, description="이전 이벤트 ID를 기반으로 이어받을지 여부"),
-    last_event_id: Optional[str] = Header(None, convert_underscores=False)
+        request: Request,
+        lantern_id: str = Path(..., regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"),
+        resume: bool = Query(False),
+        last_event_id: str = Header(None, convert_underscores=False)
 ):
     db = get_mongo_client(request)
     repo = LanternRepository(db)
+
+    # connection redis
+    redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    pubsub = redis.pubsub()
+
+    await pubsub.subscribe(f"lantern_music:{lantern_id}")
+
     start_time = time.time()
-    sent_task_ids = set()
 
-    logger.info(f"[music_status] Lantern ID 요청: {lantern_id}, resume={resume}, last_event_id={last_event_id}")
-
+    # check db
     doc = await repo.find_by_lantern_id(lantern_id)
     if not doc:
-        logger.warning(f"[music_status] Lantern '{lantern_id}' not found")
+        await pubsub.unsubscribe()
         raise NotFoundError(f"Lantern ID '{lantern_id}' not found")
 
-    if resume and last_event_id:
-        valid_ids = {s["task_id"] for s in doc.get("music_statuses", [])}
-        if last_event_id in valid_ids:
-            sent_task_ids.add(last_event_id)
-            logger.info(f"[music_status] Resumed from last_event_id={last_event_id}")
-        else:
-            logger.error(f"[music_status] Invalid resume event: {last_event_id}")
-            raise InvalidResumeEventError(last_event_id)
-
-    polling_interval = getattr(settings, 'SSE_POLLING_INTERVAL', 3)
+    # filter sent task with last-event-id
+    sent_task_ids = get_initial_sent_tasks(doc, resume, last_event_id)
 
     async def event_generator():
-        nonlocal doc
-        while True:
-            try:
-                if await request.is_disconnected():
-                    logger.info(f"[music_status] Client disconnected: {lantern_id}")
-                    break
-                if time.time() - start_time > settings.SSE_TIMEOUT:
-                    logger.info(f"[music_status] SSE timeout: {lantern_id}")
-                    break
+        try:
+            # sent task is already marked as success/failed
+            initial_statuses = doc.get("music_statuses", [])
+            new_updates = get_new_status_updates(initial_statuses, sent_task_ids)
+            for s in new_updates:
+                yield format_sse_event(s)
+                sent_task_ids.add(s["task_id"])
 
-                doc = await repo.find_by_lantern_id(lantern_id)
-                if not doc:
-                    logger.warning(f"[music_status] Lantern '{lantern_id}' deleted during SSE")
-                    yield {
-                        "event": "error",
-                        "data": json.dumps({"error": f"Lantern ID '{lantern_id}' not found"})
-                    }
-                    break
+            while True:
+                if await request.is_disconnected(): break
+                if time.time() - start_time > settings.SSE_TIMEOUT: break
 
-                statuses = doc.get("music_statuses", [])
-                new_completed = [
-                    s for s in statuses
-                    if s["status"] == "success" and s["task_id"] not in sent_task_ids
-                ]
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
 
-                for s in new_completed:
-                    logger.info(f"[music_status] Task completed: task_id={s['task_id']}, lantern_id={lantern_id}")
-                    yield {
-                        "id": s["task_id"],
-                        "event": "music_done_partial",
-                        "data": json.dumps(s)
-                    }
-                    sent_task_ids.add(s["task_id"])
+                if message:
+                    data = json.loads(message['data'])
+                    if data["task_id"] not in sent_task_ids:
+                        yield format_sse_event(data)
+                        sent_task_ids.add(data["task_id"])
 
-                if all(s["status"] == "success" for s in statuses) and len(statuses) > 0:
+                # DB check to ensure all tasks are truly finished
+                current_doc = await repo.find_by_lantern_id(lantern_id)
+                statuses = current_doc.get("music_statuses", [])
+
+                if all(s["status"] in ["success", "failed"] for s in statuses) and len(statuses) > 0:
                     if "done-all" not in sent_task_ids:
-                        logger.info(f"[music_status] All tasks completed for lantern_id={lantern_id}")
                         yield {
                             "id": "done-all",
                             "event": "music_done_all",
                             "data": json.dumps(statuses)
                         }
-                        sent_task_ids.add("done-all")
                     break
 
-            except Exception as e:
-                logger.exception(f"[music_status] Database query failed for lantern_id={lantern_id}")
-                yield {
-                    "event": "error",
-                    "data": json.dumps({"error": "Database query failed", "detail": str(e)})
-                }
-                break
-
-            await asyncio.sleep(polling_interval)
+        finally:
+            await pubsub.unsubscribe(f"lantern_music:{lantern_id}")
+            await redis.close()
 
     return EventSourceResponse(event_generator(), ping=15)
 
@@ -132,19 +137,18 @@ async def music_status(
 @router.post(
     "/lanterns",
     response_model=ResponseModel[dict],
-    responses={
-        200: success_200_create_lantern,
-        400: error_400_lantern_examples,
-        500: error_500
-    }
+    responses={200: success_200_create_lantern, 400: error_400_lantern_examples, 500: error_500}
 )
 async def create_lanterns(
-    request: Request,
-    name: str = Form(..., min_length=1, max_length=50, description="사용자 이름 (1~50자)"),
-    images: List[UploadFile] = File(..., description="이미지 파일 (jpg, jpeg, png, webp, 각 5MB 이하, 총 3장)"),
-    is_public: bool = Form(True, description="랜턴을 공개할지 여부"),
+        request: Request,
+        name: str = Form(..., min_length=1, max_length=50, description="User name"),
+        images: List[UploadFile] = File(..., description="Image files"),
+        is_public: bool = Form(True, description="Public visibility"),
 ):
-    logger.info(f"[create_lanterns] New lantern requested: name={name}, is_public={is_public}")
+    """
+    create a new lantern(needs user's info & image metadata)
+    """
+    logger.info(f"[create_lanterns] Request received: name={name}")
 
     db = get_mongo_client(request)
     validate_name(name)
@@ -152,38 +156,29 @@ async def create_lanterns(
 
     lantern_service = LanternService(db)
     lantern_id = await lantern_service.create_lanterns(
-        name=name,
-        images=images,
-        is_public=is_public
+        name=name, images=images, is_public=is_public
     )
 
-    logger.info(f"[create_lanterns] Lantern created successfully: {lantern_id}")
+    logger.info(f"[create_lanterns] Lantern created: {lantern_id}")
     return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")
 
 
 @router.get(
     "/lanterns",
     response_model=ResponseModel[List[LanternResponseModel]],
-    responses={
-        200: {"description": "Lantern List"},
-        400: error_400,
-        404: error_404,
-        500: error_500
-    }
+    responses={200: {"description": "Lantern List"}, 400: error_400, 404: error_404, 500: error_500}
 )
 async def get_lantern_list(
-    request: Request,
-    current_lantern_id: Optional[str] = Query(
-        None,
-        description="현재 체험 중인 사용자 랜턴 ID",
-        regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
-    )
+        request: Request,
+        current_lantern_id: Optional[str] = Query(None, regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$")
 ):
-    logger.info(f"[get_lantern_list] Fetching lantern list, current_lantern_id={current_lantern_id}")
-
+    """
+    list of recent lanterns + excluding or highlighting the current user's lantern
+    """
     db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lanterns = await lantern_service.get_recent_lanterns(current_lantern_id=current_lantern_id)
+
     return success_no_cache_response(
         data=[lantern.model_dump() for lantern in lanterns],
         message="Lantern list"
@@ -193,28 +188,17 @@ async def get_lantern_list(
 @router.get(
     "/lanterns/{lantern_id}",
     response_model=ResponseModel[LanternDetailResponseModel],
-    responses={
-        200: {"description": "Lantern Detail"},
-        400: error_400,
-        403: error_403,
-        404: error_404,
-        500: error_500
-    }
+    responses={200: {"description": "Lantern Detail"}, 404: error_404}
 )
 async def get_lantern_detail(
-    request: Request,
-    lantern_id: str = Path(
-        ...,
-        description="조회할 랜턴의 ID",
-        regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$"
-    )
+        request: Request,
+        lantern_id: str = Path(..., regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$")
 ):
-    logger.info(f"[get_lantern_detail] Fetching detail for lantern_id={lantern_id}")
-
+    """
+    for detailed info for specific lantern
+    """
     db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lantern = await lantern_service.get_lantern_detail(lantern_id)
-    return success_response(
-        data=lantern.model_dump(),
-        message="Lantern detail"
-    )
+
+    return success_response(data=lantern.model_dump(), message="Lantern detail")
