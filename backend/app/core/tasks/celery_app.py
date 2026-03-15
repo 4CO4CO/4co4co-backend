@@ -3,7 +3,8 @@ from app.core.config.settings import settings
 
 celery_app = Celery(
     "backend",
-    broker=settings.RABBITMQ_URL,
+    broker=settings.REDIS_URL,
+    backend=settings.MONGO_URI,
     include=["app.core.tasks.music_tasks"],
 )
 

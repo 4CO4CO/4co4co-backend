@@ -34,9 +34,7 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET_NAME: str = Field(..., description="S3 bucket name")
 
     # RabbitMQ configuration
-    RABBITMQ_URL: str = Field(..., description="RabbitMQ broker URL")
-    RABBITMQ_USER: str = Field(..., description="RabbitMQ username")
-    RABBITMQ_PASS: str = Field(..., description="RabbitMQ password")
+    REDIS_URL: str = Field(..., description="Redis URL for Celery Broker and Pub/Sub")
 
     # Server-Sent Events (SSE) configuration
     SSE_TIMEOUT: int = Field(
