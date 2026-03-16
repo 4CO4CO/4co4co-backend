@@ -12,7 +12,6 @@ logger = get_logger(__name__)
 
 redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
-
 @celery_app.task(
     name="process_lantern_music",
     acks_late=True,
@@ -25,11 +24,22 @@ def process_lantern_music(lantern_id: str, image_key: str):
     repo = LanternRepository(db)
     service = MusicService(db)
 
-    try:
+    existing_doc = repo.collection.find_one({
+        "lantern_id": lantern_id,
+        "music_statuses": {
+            "$elemMatch": {"image_s3": image_key, "status": "success"}
+        }
+    }, {"music_statuses.$": 1})
 
+    if existing_doc:
+        logger.info(f"[Skip Task] Already succeeded: lantern_id={lantern_id}, image={image_key}")
+        # 이미 성공 -> 연산 생략
+        return existing_doc["music_statuses"][0].get("s3_key")
+
+    try:
+        logger.info(f"[Task Start] lantern_id={lantern_id}, image={image_key}")
         s3_key = service.generate_music(lantern_id=lantern_id, image=image_key)
 
-        # update MongoDB status to success
         repo.collection.update_one(
             {"lantern_id": lantern_id, "music_statuses.image_s3": image_key},
             {
@@ -41,7 +51,6 @@ def process_lantern_music(lantern_id: str, image_key: str):
             }
         )
 
-        # publish success event to redis
         event_payload = {
             "lantern_id": lantern_id,
             "image_s3": image_key,
@@ -51,13 +60,16 @@ def process_lantern_music(lantern_id: str, image_key: str):
         }
         redis_client.publish(f"lantern_music:{lantern_id}", json.dumps(event_payload))
 
+        logger.info(f"[Task Success] lantern_id={lantern_id}, image={image_key}")
         return s3_key
 
+
     except Exception as e:
+
         logger.error(f"[Task Error] lantern_id={lantern_id}, error={e}")
 
-        # update MongoDB status to failed
         repo.collection.update_one(
+
             {"lantern_id": lantern_id, "music_statuses.image_s3": image_key},
             {
                 "$set": {
@@ -68,13 +80,13 @@ def process_lantern_music(lantern_id: str, image_key: str):
             }
         )
 
-        # publish failed event to redis
         error_payload = {
             "lantern_id": lantern_id,
             "image_s3": image_key,
             "status": "failed",
             "task_id": image_key
         }
+
         redis_client.publish(f"lantern_music:{lantern_id}", json.dumps(error_payload))
 
         raise e

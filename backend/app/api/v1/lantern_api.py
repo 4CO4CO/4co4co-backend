@@ -1,9 +1,9 @@
-import asyncio
 import json
 import time
 from typing import Optional, List, Set, Dict, Any
 
-from fastapi import APIRouter, UploadFile, File, Form, Query, Path, Request, Header
+import aioredis
+from fastapi import APIRouter, UploadFile, File, Form, Query, Path, Request, Header, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.config.settings import settings
@@ -29,9 +29,6 @@ router = APIRouter()
 # --- Helper Functions for SSE ---
 
 def get_initial_sent_tasks(doc: Dict[str, Any], resume: bool, last_event_id: Optional[str]) -> Set[str]:
-    """
-    using last_event_id to preventing duplication
-    """
     sent_task_ids = set()
     if resume and last_event_id:
         statuses = doc.get("music_statuses", [])
@@ -43,9 +40,6 @@ def get_initial_sent_tasks(doc: Dict[str, Any], resume: bool, last_event_id: Opt
 
 
 def get_new_status_updates(statuses: List[Dict[str, Any]], sent_task_ids: Set[str]) -> List[Dict[str, Any]]:
-    """
-    filtering pending status -> returns success & failed
-    """
     return [
         s for s in statuses
         if s["status"] in ["success", "failed"] and s["task_id"] not in sent_task_ids
@@ -53,9 +47,6 @@ def get_new_status_updates(statuses: List[Dict[str, Any]], sent_task_ids: Set[st
 
 
 def format_sse_event(status_data: Dict[str, Any]) -> Dict[str, str]:
-    """
-    formating(DB -> SSE)
-    """
     event_name = "music_done_partial" if status_data["status"] == "success" else "music_failed"
     return {
         "id": status_data["task_id"],
@@ -76,7 +67,7 @@ async def music_status(
     db = get_mongo_client(request)
     repo = LanternRepository(db)
 
-    # connection redis
+    # connection redis (using aioredis for async SSE)
     redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     pubsub = redis.pubsub()
 
@@ -84,18 +75,15 @@ async def music_status(
 
     start_time = time.time()
 
-    # check db
     doc = await repo.find_by_lantern_id(lantern_id)
     if not doc:
         await pubsub.unsubscribe()
         raise NotFoundError(f"Lantern ID '{lantern_id}' not found")
 
-    # filter sent task with last-event-id
     sent_task_ids = get_initial_sent_tasks(doc, resume, last_event_id)
 
     async def event_generator():
         try:
-            # sent task is already marked as success/failed
             initial_statuses = doc.get("music_statuses", [])
             new_updates = get_new_status_updates(initial_statuses, sent_task_ids)
             for s in new_updates:
@@ -114,7 +102,6 @@ async def music_status(
                         yield format_sse_event(data)
                         sent_task_ids.add(data["task_id"])
 
-                # DB check to ensure all tasks are truly finished
                 current_doc = await repo.find_by_lantern_id(lantern_id)
                 statuses = current_doc.get("music_statuses", [])
 
@@ -146,10 +133,37 @@ async def create_lanterns(
         is_public: bool = Form(True, description="Public visibility"),
 ):
     """
-    create a new lantern(needs user's info & image metadata)
+    create a new lantern with queue length check (Rate Limiting)
     """
     logger.info(f"[create_lanterns] Request received: name={name}")
 
+    try:
+        # aioredis를 사용하여 비동기로 큐 길이 확인
+        redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        queue_length = await redis.llen("celery")
+        await redis.close()
+
+        MAX_QUEUE_SIZE = 50
+        if queue_length >= MAX_QUEUE_SIZE:
+            logger.warning(f"[Queue Full] current_length={queue_length}, limit={MAX_QUEUE_SIZE}")
+            raise HTTPException(
+                status_code=503,
+                detail="현재 대기 인원이 많습니다. 잠시 후 다시 시도해주세요."
+            )
+
+    except (ConnectionError, aioredis.RedisError) as e:
+        # Redis가 죽어있는 경우
+        logger.error(f"[Redis Dead] 연결 실패: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="서비스 통신이 원활하지 않습니다. 잠시 후 다시 시도해주세요."
+        )
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        logger.error(f"[Unknown Error] {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    # 2. Validation & Processing
     db = get_mongo_client(request)
     validate_name(name)
     validate_images(images)
@@ -159,8 +173,16 @@ async def create_lanterns(
         name=name, images=images, is_public=is_public
     )
 
-    logger.info(f"[create_lanterns] Lantern created: {lantern_id}")
-    return success_response(data={"lantern_id": lantern_id}, message="Lantern Created")
+    logger.info(f"[create_lanterns] Lantern created: {lantern_id}, waiting_count={queue_length}")
+
+    # 응답에 현재 대기 작업 수를 포함하여 전달
+    return success_response(
+        data={
+            "lantern_id": lantern_id,
+            "waiting_count": queue_length
+        },
+        message="Lantern Created"
+    )
 
 
 @router.get(
@@ -172,9 +194,6 @@ async def get_lantern_list(
         request: Request,
         current_lantern_id: Optional[str] = Query(None, regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$")
 ):
-    """
-    list of recent lanterns + excluding or highlighting the current user's lantern
-    """
     db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lanterns = await lantern_service.get_recent_lanterns(current_lantern_id=current_lantern_id)
@@ -194,9 +213,6 @@ async def get_lantern_detail(
         request: Request,
         lantern_id: str = Path(..., regex=r"^[가-힣a-zA-Z0-9]+-[0-9]{4}$")
 ):
-    """
-    for detailed info for specific lantern
-    """
     db = get_mongo_client(request)
     lantern_service = LanternService(db)
     lantern = await lantern_service.get_lantern_detail(lantern_id)
