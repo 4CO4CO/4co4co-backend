@@ -10,7 +10,6 @@ from app.core.logging.logger import get_logger
 logger = get_logger(__name__)
 
 
-# Handler for RequestValidationError(400 Bad Request)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
 
     first_error = exc.errors()[0]["msg"] if exc.errors() else "Invalid input format."
@@ -42,7 +41,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-# Handler for custom AppError
 async def app_error_handler(request: Request, exc: AppError):
 
     status_code = getattr(exc, "status_code", 500)
@@ -78,7 +76,6 @@ async def app_error_handler(request: Request, exc: AppError):
     )
 
 
-# Handler for uncaught generic exceptions (500 Internal Server Error)
 async def generic_exception_handler(request: Request, exc: Exception):
 
     logger.exception(

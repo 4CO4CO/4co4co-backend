@@ -4,15 +4,16 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
-    # Environment
+    # 환경 구분
     APP_ENV: str = Field("production", description="Application environment (e.g., production, development)")
     LOG_LEVEL: str = Field("INFO", description="Log level (DEBUG, INFO, WARNING, ERROR)")
     DISCORD_WEBHOOK_URL: str | None = Field(
         None,
         description="Discord Webhook URL for error alerts (optional)"
     )
+    CORS_ORIGINS: str = "http://localhost:5173"
 
-    # MongoDB configuration
+    # MongoDB
     MONGO_URI: str = Field(..., description="MongoDB connection URI")
     MONGO_DB: str = Field(..., description="MongoDB database name")
     MONGO_MAX_POOL_SIZE: int = Field(10, description="Maximum number of connections in the pool")
@@ -23,30 +24,25 @@ class Settings(BaseSettings):
     )
     MONGO_INITDB_DATABASE: str = Field(..., description="Database to initialize on startup")
 
-    # API configuration
+    # API
     API_PREFIX: str = Field(..., description="API prefix (e.g., /api/v1)")
     AI_SERVER_URL: str = Field(..., description="Base URL of the AI server")
 
-    # AWS configuration
+    # AWS
     AWS_ACCESS_KEY_ID: str = Field(..., description="AWS access key ID")
     AWS_SECRET_ACCESS_KEY: str = Field(..., description="AWS secret access key")
     AWS_REGION: str = Field(..., description="AWS region")
     AWS_S3_BUCKET_NAME: str = Field(..., description="S3 bucket name")
 
-    # RabbitMQ configuration
+    # Redis
     REDIS_URL: str = Field(..., description="Redis URL for Celery Broker and Pub/Sub")
 
-    # Server-Sent Events (SSE) configuration
-    SSE_TIMEOUT: int = Field(
-        180,
-        gt=0,
-        description="SSE connection keep-alive time in seconds"
-    )
-    SSE_POLLING_INTERVAL: int = Field(
-        3,
-        gt=0,
-        description="Interval in seconds for SSE polling"
-    )
+    # SSE
+    SSE_TIMEOUT: int = Field(180, gt=0)
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
     class Config:
         env_file = ".env"

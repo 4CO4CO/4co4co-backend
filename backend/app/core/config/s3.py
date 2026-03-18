@@ -151,12 +151,12 @@ async def get_file_url_from_s3(s3_key: str, expires_in: int = 3600) -> Optional[
 
 
 async def init_s3_service():
-    """Initialize S3 service"""
+
     logger.info("[S3 Service] Initializing...")
 
 
 async def close_s3_service():
-    """Shutdown S3 service and close connections"""
+
     logger.info("[S3 Service] Closing connections...")
     await s3_service.close()
 

@@ -8,7 +8,6 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.config.settings import settings
 from app.core.db.database import get_mongo_client
-from app.core.exceptions.types import NotFoundError
 from app.core.logging.logger import get_logger
 from app.core.response.response import success_response, success_no_cache_response
 from app.core.validation.lantern_validation import validate_name, validate_images
@@ -26,9 +25,10 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-# --- Helper Functions for SSE ---
+# --- SSE Helper ---
 
 def get_initial_sent_tasks(doc: Dict[str, Any], resume: bool, last_event_id: Optional[str]) -> Set[str]:
+    """재연결 시 last_event_id가 있는 경우 -> 이미 보낸 것을 체크"""
     sent_task_ids = set()
     if resume and last_event_id:
         statuses = doc.get("music_statuses", [])
@@ -40,6 +40,7 @@ def get_initial_sent_tasks(doc: Dict[str, Any], resume: bool, last_event_id: Opt
 
 
 def get_new_status_updates(statuses: List[Dict[str, Any]], sent_task_ids: Set[str]) -> List[Dict[str, Any]]:
+    """DB에 이미 기록된 상태 중 아직 전송하지 않은 업데이트 추출"""
     return [
         s for s in statuses
         if s["status"] in ["success", "failed"] and s["task_id"] not in sent_task_ids
@@ -47,6 +48,7 @@ def get_new_status_updates(statuses: List[Dict[str, Any]], sent_task_ids: Set[st
 
 
 def format_sse_event(status_data: Dict[str, Any]) -> Dict[str, str]:
+    """데이터를 SSE 포맷으로 변환"""
     event_name = "music_done_partial" if status_data["status"] == "success" else "music_failed"
     return {
         "id": status_data["task_id"],
@@ -55,8 +57,76 @@ def format_sse_event(status_data: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
-# --- Router Endpoints ---
+async def lantern_event_generator(
+        request: Request,
+        lantern_id: str,
+        repo: LanternRepository,
+        resume: bool,
+        last_event_id: Optional[str]
+):
+    """실시간 이벤트를 생성하는 비동기 제너레이터"""
+    redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    pubsub = redis.pubsub()
+    await pubsub.subscribe(f"lantern_music:{lantern_id}")
 
+    start_time = time.time()
+
+    try:
+        # 잘못된 요청 (lantern 을 생성한 적이 없는 lantern_id)
+        doc = await repo.find_by_lantern_id(lantern_id)
+        if not doc:
+            yield {"event": "error", "data": "Lantern not found"}
+            return
+
+        sent_task_ids = get_initial_sent_tasks(doc, resume, last_event_id)
+        initial_updates = get_new_status_updates(doc.get("music_statuses", []), sent_task_ids)
+
+        for s in initial_updates:
+            yield format_sse_event(s)
+            sent_task_ids.add(s["task_id"])
+
+        # 2. 실시간 루프 (Redis Pub/Sub 대기)
+        while not await request.is_disconnected():
+            # 타임아웃 체크 (서버 자원 보호)
+            if time.time() - start_time > settings.SSE_TIMEOUT:
+                logger.info(f"[SSE] Timeout reached for {lantern_id}")
+                break
+
+            # Redis 메시지 수신 (비동기)
+            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+
+            if message:
+                data = json.loads(message['data'])
+                if data["task_id"] not in sent_task_ids:
+                    yield format_sse_event(data)
+                    sent_task_ids.add(data["task_id"])
+
+                # 모든 작업 완료 여부 확인 -> 3개 배경음 완성이 되었는지 (메시지가 올 경우에만)
+                current_doc = await repo.find_by_lantern_id(lantern_id)
+                statuses = current_doc.get("music_statuses", [])
+
+                if all(s["status"] in ["success", "failed"] for s in statuses): # 진행 중인 것이 없는 것을 확인
+                    yield {
+                        "id": "done-all",
+                        "event": "music_done_all",
+                        "data": json.dumps(statuses)
+                    }
+                    break
+
+    except Exception as e:
+        logger.error(f"[SSE Error] {e}", exc_info=True)
+        yield {"event": "error", "data": str(e)}
+    finally:
+        await pubsub.unsubscribe(f"lantern_music:{lantern_id}")
+        await redis.close()
+        logger.info(f"[SSE] Connection closed for {lantern_id}")
+
+
+# --- 주요 API들 ---
+
+"""
+배경음 생성 완료 여부 SSE 통신하기
+"""
 @router.get("/lanterns/{lantern_id}/music-status")
 async def music_status(
         request: Request,
@@ -67,60 +137,15 @@ async def music_status(
     db = get_mongo_client(request)
     repo = LanternRepository(db)
 
-    # connection redis (using aioredis for async SSE)
-    redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    pubsub = redis.pubsub()
-
-    await pubsub.subscribe(f"lantern_music:{lantern_id}")
-
-    start_time = time.time()
-
-    doc = await repo.find_by_lantern_id(lantern_id)
-    if not doc:
-        await pubsub.unsubscribe()
-        raise NotFoundError(f"Lantern ID '{lantern_id}' not found")
-
-    sent_task_ids = get_initial_sent_tasks(doc, resume, last_event_id)
-
-    async def event_generator():
-        try:
-            initial_statuses = doc.get("music_statuses", [])
-            new_updates = get_new_status_updates(initial_statuses, sent_task_ids)
-            for s in new_updates:
-                yield format_sse_event(s)
-                sent_task_ids.add(s["task_id"])
-
-            while True:
-                if await request.is_disconnected(): break
-                if time.time() - start_time > settings.SSE_TIMEOUT: break
-
-                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-
-                if message:
-                    data = json.loads(message['data'])
-                    if data["task_id"] not in sent_task_ids:
-                        yield format_sse_event(data)
-                        sent_task_ids.add(data["task_id"])
-
-                current_doc = await repo.find_by_lantern_id(lantern_id)
-                statuses = current_doc.get("music_statuses", [])
-
-                if all(s["status"] in ["success", "failed"] for s in statuses) and len(statuses) > 0:
-                    if "done-all" not in sent_task_ids:
-                        yield {
-                            "id": "done-all",
-                            "event": "music_done_all",
-                            "data": json.dumps(statuses)
-                        }
-                    break
-
-        finally:
-            await pubsub.unsubscribe(f"lantern_music:{lantern_id}")
-            await redis.close()
-
-    return EventSourceResponse(event_generator(), ping=15)
+    return EventSourceResponse(
+        lantern_event_generator(request, lantern_id, repo, resume, last_event_id),
+        ping=15
+    )
 
 
+"""
+랜턴 생성하기
+"""
 @router.post(
     "/lanterns",
     response_model=ResponseModel[dict],
@@ -185,6 +210,9 @@ async def create_lanterns(
     )
 
 
+"""
+최근 20개 랜턴 목록 조회하기
+"""
 @router.get(
     "/lanterns",
     response_model=ResponseModel[List[LanternResponseModel]],
@@ -203,7 +231,9 @@ async def get_lantern_list(
         message="Lantern list"
     )
 
-
+"""
+lantern_id에 따른 상세 내용 조회하기
+"""
 @router.get(
     "/lanterns/{lantern_id}",
     response_model=ResponseModel[LanternDetailResponseModel],

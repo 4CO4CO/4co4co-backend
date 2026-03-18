@@ -30,6 +30,9 @@ class LanternService:
     def __init__(self, db):
         self.lantern_repo = LanternRepository(db)
 
+    """
+    랜턴 생성하기
+    """
     async def create_lanterns(
             self,
             name: str,
@@ -99,6 +102,9 @@ class LanternService:
 
         return lantern_id
 
+    """
+    최근 20개 랜턴 목록 조회하기
+    """
     async def get_recent_lanterns(self, current_lantern_id: Optional[str] = None, limit: int = 20):
         logger.info(f"[LanternService] Fetching recent lanterns, current_lantern_id={current_lantern_id}, limit={limit}")
         current_doc = None
@@ -123,6 +129,9 @@ class LanternService:
         docs = [current_doc] + other_docs if current_doc else other_docs
         return [to_lantern_model(doc, current_lantern_id) for doc in docs]
 
+    """
+    lantern_id에 맞는 상세 내용 조회하기
+    """
     async def get_lantern_detail(self, lantern_id: str):
         logger.info(f"[LanternService] Fetching detail for lantern_id={lantern_id}")
 

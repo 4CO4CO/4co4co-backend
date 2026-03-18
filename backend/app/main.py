@@ -12,13 +12,9 @@ from app.core.exceptions.types import AppError
 
 app = FastAPI(lifespan=lifespan)
 
-origins = [
-    "http://localhost:5173",
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -37,18 +37,16 @@ def get_logger(name: str):
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s")
 
     if not logger.handlers:
-        # console handler
+
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
         logger.addHandler(stream_handler)
 
-        # file handler
         os.makedirs("logs", exist_ok=True)
         file_handler = logging.FileHandler("logs/app.log", encoding="utf-8")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
-    # add discord handler
     if settings.DISCORD_WEBHOOK_URL and not any(isinstance(h, DiscordHandler) for h in logger.handlers):
         discord_handler = DiscordHandler(settings.DISCORD_WEBHOOK_URL, level=logging.ERROR)
         discord_handler.setFormatter(formatter)

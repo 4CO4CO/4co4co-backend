@@ -3,12 +3,11 @@ from app.core.config.settings import settings
 
 celery_app = Celery(
     "backend",
-    broker=settings.REDIS_URL,
-    backend=settings.MONGO_URI,
+    broker=settings.REDIS_URL, # 브로커: RabbitMQ -> Redis로 수정
+    backend=settings.MONGO_URI, # 결과 저장소
     include=["app.core.tasks.music_tasks"],
 )
 
-# configuration
 celery_app.conf.update(
     task_default_queue='celery',
     task_serializer='json',
@@ -17,7 +16,7 @@ celery_app.conf.update(
     timezone='Asia/Seoul',
     enable_utc=True,
 
-    # 작업이 성공적으로 끝났을 때만 ACK를 보냄
+    # 작업이 성공적으로 끝났을 때만 ACK를 보내게 하기 위함 -> 불안정한 AI 서버를 대비해 메시지 유실 방지
     task_acks_late=True,
 
     # Redis 브로커 상세 설정

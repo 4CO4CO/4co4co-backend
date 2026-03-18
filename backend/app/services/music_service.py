@@ -26,7 +26,7 @@ def call_ai_server(image: str) -> str:
         logger.error(f"[AI Server] Request failed: {e}", exc_info=True)
         raise AppError(f"AI server request failed: {e}")
 
-    # Validate response
+    # 응답 Validate
     if body.get("status") != "success":
         logger.error(f"[AI Server] Returned error: {body.get('message', 'unknown')}")
         raise AppError(f"AI returned error: {body.get('message', 'unknown')}")
@@ -46,6 +46,9 @@ class MusicService:
         self.db = db
         self.lantern_repo = LanternRepository(db)
 
+    """
+    AI 서버로 요청보내기
+    """
     def generate_music(
         self,
         lantern_id: str,
