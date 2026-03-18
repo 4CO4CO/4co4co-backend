@@ -3,9 +3,8 @@ from fastapi.openapi.utils import get_openapi
 
 
 def custom_openapi(app: FastAPI):
-    """
-    Generate a custom OpenAPI schema for the FastAPI app.
-    """
+
+    # 캐시된 openai 스키마 반환
     if app.openapi_schema:
         return app.openapi_schema
 
@@ -19,9 +18,11 @@ def custom_openapi(app: FastAPI):
     for path in openapi_schema.get("paths", {}).values():
         for operation in path.values():
             responses = operation.get("responses", {})
-            # Remove default 422 response (validation errors)
+
+            # 디폴트 422 제거
             if "422" in responses:
                 del responses["422"]
 
+    # 캐시 업데이트
     app.openapi_schema = openapi_schema
     return app.openapi_schema

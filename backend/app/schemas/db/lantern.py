@@ -6,38 +6,30 @@ from pydantic import BaseModel, Field, ConfigDict, field_serializer
 
 
 class MusicStatusInfo(BaseModel):
-    """
-    Represents the processing status of music generation for a given image.
-    Used for tracking Celery task progress.
-    """
+
     image_s3: str
     task_id: str
-    status: str  # 'pending', 'success', 'failed'
+    status: str
     s3_key: Optional[str] = None
-
-    error_msg: Optional[str] = None
-    updated_at: Optional[datetime] = None
 
 
 class ImageInfo(BaseModel):
-    """Metadata about an uploaded image."""
+
     s3_key: str
-    original_filename: Optional[str] = None
-    file_extension: Optional[str] = None
-    file_size: Optional[int] = None
+    original_filename: Optional[str]
+    file_extension: Optional[str]
+    file_size: Optional[int]
 
 
 class MusicInfo(BaseModel):
-    """Metadata about a generated music file."""
+
     s3_path: str
     created_at: datetime
 
 
 class LanternDBModel(BaseModel):
-    """
-    Pydantic model representing a lantern document stored in MongoDB.
-    """
-    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: Optional[ObjectId] = Field(default=None, alias="_id")
     lantern_id: str
@@ -51,4 +43,5 @@ class LanternDBModel(BaseModel):
 
     @field_serializer('id')
     def serialize_objectid(self, id_value, _info):
-        return str(id_value) if id_value else None
+
+        return str(id_value)

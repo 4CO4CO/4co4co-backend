@@ -1,7 +1,5 @@
 class AppError(Exception):
-    """
-    Base class for all custom application exceptions.
-    """
+
     status_code = 500
     error_code = "APP_ERROR"
 
@@ -12,10 +10,7 @@ class AppError(Exception):
 
 
 class DatabaseError(AppError):
-    """
-    Raised when a database operation fails.
-    Defaults to status_code 500 with error_code 'DATABASE_ERROR'.
-    """
+
     error_code = "DATABASE_ERROR"
 
     def __init__(self, message="Database operation failed", error_code=None):
@@ -23,10 +18,7 @@ class DatabaseError(AppError):
 
 
 class FileSaveError(AppError):
-    """
-    Raised when saving or uploading a file fails.
-    Defaults to status_code 500 with error_code 'FILE_SAVE_ERROR'.
-    """
+
     error_code = "FILE_SAVE_ERROR"
 
     def __init__(self, message="File upload failed", error_code=None):
@@ -34,10 +26,7 @@ class FileSaveError(AppError):
 
 
 class ValidationError(AppError):
-    """
-    Raised when input validation fails.
-    Returns a 400 Bad Request with error_code 'VALIDATION_ERROR'.
-    """
+
     status_code = 400
     error_code = "VALIDATION_ERROR"
 
@@ -46,10 +35,7 @@ class ValidationError(AppError):
 
 
 class NotFoundError(AppError):
-    """
-    Raised when a requested resource is not found.
-    Returns a 404 Not Found with error_code 'NOT_FOUND'.
-    """
+
     status_code = 404
     error_code = "NOT_FOUND"
 
@@ -58,10 +44,7 @@ class NotFoundError(AppError):
 
 
 class ForbiddenError(AppError):
-    """
-    Raised when an action is not allowed due to insufficient permissions.
-    Returns a 403 Forbidden with error_code 'FORBIDDEN'.
-    """
+
     status_code = 403
     error_code = "FORBIDDEN"
 
@@ -70,10 +53,7 @@ class ForbiddenError(AppError):
 
 
 class InvalidResumeEventError(AppError):
-    """
-    Raised when an invalid resume event ID is provided for SSE or event streams.
-    Returns a 400 Bad Request with error_code 'INVALID_RESUME_EVENT'.
-    """
+
     status_code = 400
     error_code = "INVALID_RESUME_EVENT"
 

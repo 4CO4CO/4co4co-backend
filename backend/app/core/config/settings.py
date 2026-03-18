@@ -1,45 +1,48 @@
-from typing import List, Optional  # List 추가
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
 
-    # Environment
-    APP_ENV: str = Field("production", description="App environment")
-    LOG_LEVEL: str = Field("INFO", description="Log level")
-    DISCORD_WEBHOOK_URL: Optional[str] = Field(None, description="Discord Webhook URL")
+    # 환경 구분
+    APP_ENV: str = Field("production", description="Application environment (e.g., production, development)")
+    LOG_LEVEL: str = Field("INFO", description="Log level (DEBUG, INFO, WARNING, ERROR)")
+    DISCORD_WEBHOOK_URL: str | None = Field(
+        None,
+        description="Discord Webhook URL for error alerts (optional)"
+    )
+    CORS_ORIGINS: str = "http://localhost:5173"
 
     # MongoDB
-    MONGO_URI: str = Field(..., description="MongoDB Connection URI")
-    MONGO_DB_NAME: str = Field(..., description="MongoDB Database Name")
-    MONGO_MAX_POOL_SIZE: int = Field(10)
-    MONGO_MIN_POOL_SIZE: int = Field(0)
-    MONGO_SERVER_SELECTION_TIMEOUT_MS: int = Field(5000)
+    MONGO_URI: str = Field(..., description="MongoDB connection URI")
+    MONGO_DB: str = Field(..., description="MongoDB database name")
+    MONGO_MAX_POOL_SIZE: int = Field(10, description="Maximum number of connections in the pool")
+    MONGO_MIN_POOL_SIZE: int = Field(0, description="Minimum number of connections in the pool")
+    MONGO_SERVER_SELECTION_TIMEOUT_MS: int = Field(
+        5000,
+        description="Server selection timeout in milliseconds"
+    )
+    MONGO_INITDB_DATABASE: str = Field(..., description="Database to initialize on startup")
 
     # API
-    API_PREFIX: str = Field("/api/v1", description="API Prefix")
-    AI_SERVER_URL: str = Field(..., description="AI Server Base URL")
+    API_PREFIX: str = Field(..., description="API prefix (e.g., /api/v1)")
+    AI_SERVER_URL: str = Field(..., description="Base URL of the AI server")
 
-    # CORS
-    BACKEND_CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:5173", "http://127.0.0.1:5173"],
-        description="List of allowed CORS origins"
-    )
+    # AWS
+    AWS_ACCESS_KEY_ID: str = Field(..., description="AWS access key ID")
+    AWS_SECRET_ACCESS_KEY: str = Field(..., description="AWS secret access key")
+    AWS_REGION: str = Field(..., description="AWS region")
+    AWS_S3_BUCKET_NAME: str = Field(..., description="S3 bucket name")
 
-    # AWS S3
-    AWS_ACCESS_KEY_ID: str = Field(...)
-    AWS_SECRET_ACCESS_KEY: str = Field(...)
-    AWS_REGION: str = Field("ap-northeast-2")
-    AWS_S3_BUCKET_NAME: str = Field(...)
-
-    # Celery (Redis)
-    CELERY_BROKER_URL: str = Field(..., description="Redis Broker URL")
-    CELERY_RESULT_BACKEND: Optional[str] = Field(None, description="Redis Result Backend")
+    # Redis
+    REDIS_URL: str = Field(..., description="Redis URL for Celery Broker and Pub/Sub")
 
     # SSE
-    SSE_TIMEOUT: int = Field(180)
-    SSE_POLLING_INTERVAL: int = Field(3)
+    SSE_TIMEOUT: int = Field(180, gt=0)
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
     class Config:
         env_file = ".env"

@@ -11,9 +11,7 @@ logger = get_logger(__name__)
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """
-    Handle FastAPI's built-in validation errors (e.g., invalid request body/query).
-    """
+
     first_error = exc.errors()[0]["msg"] if exc.errors() else "Invalid input format."
 
     response_data = {
@@ -44,9 +42,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 async def app_error_handler(request: Request, exc: AppError):
-    """
-    Handle application-defined exceptions (AppError).
-    """
+
     status_code = getattr(exc, "status_code", 500)
     error_code = getattr(exc, "error_code", "UNKNOWN_ERROR")
     message = str(exc)
@@ -81,9 +77,7 @@ async def app_error_handler(request: Request, exc: AppError):
 
 
 async def generic_exception_handler(request: Request, exc: Exception):
-    """
-    Handle unexpected/unhandled exceptions.
-    """
+
     logger.exception(
         "[Unhandled Exception] %s %s - %s",
         request.method,

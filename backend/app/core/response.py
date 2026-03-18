@@ -5,7 +5,8 @@ from fastapi.responses import JSONResponse
 from app.schemas.response.schemas import ResponseModel, ErrorResponseModel
 
 
-def success_response(data: Any, message: str = "Success") -> ResponseModel:
+def success_response(data: Any, message: str = "Success"):
+
     return ResponseModel(
         status="success",
         message=message,
@@ -13,7 +14,8 @@ def success_response(data: Any, message: str = "Success") -> ResponseModel:
     )
 
 
-def error_response(message: str = "An error occurred", error_code: str = "UNKNOWN_ERROR") -> ErrorResponseModel:
+def error_response(message: str = "An error occurred", error_code: str = "UNKNOWN_ERROR"):
+
     return ErrorResponseModel(
         status="error",
         error_code=error_code,
@@ -21,11 +23,11 @@ def error_response(message: str = "An error occurred", error_code: str = "UNKNOW
     )
 
 
-def success_no_cache_response(data: Any, message: str = "Success") -> JSONResponse:
-    model = success_response(data=data, message=message)
+def success_no_cache_response(data: Any, message: str = "Success"):
 
+    model = success_response(data=data, message=message)
     return JSONResponse(
-        content=model.model_dump(mode='json'),
+        content=model.model_dump(),
         headers={
             "Cache-Control": "no-store, no-cache, must-revalidate",
             "Pragma": "no-cache",
